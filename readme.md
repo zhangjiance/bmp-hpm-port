@@ -3,7 +3,10 @@
 本仓库是基于blackmagic的hpm平台移植，目前适配：
 
 - hslinklite(hpm5301)
+  - ![alt text](image/hslinklite.png)
+
 - hslinkpro(hpm5301)
+  - ![alt text](image/hslinkpro.png)
 
 ## 工程说明
 
@@ -26,13 +29,23 @@
 
 ## 效果展示
 
+### SWD调试波形
+
 使用hpm做移植的好处是可以通过fgpio和spi外设，使得swd/jtag时钟速度更快，从而提高调试效率。
 
-- 目前适配了fgpio模式，spi模式正在移植中。
+- fgpio模式，目前SWD时钟最快可达`18M`
 
 ![alt text](image/fgpio-swd-speed.png)
 
-## bmp命令使用说明
+- spi模式适配中，适配后SWD最高`80M`
+
+### 命令行调试演示
+
+通过gdb强大的命令直驱BMP可以获得比ide更加灵活和高效的调试体验。
+
+![alt text](image/debug.png)
+
+## bmp使用说明
 
 - `xxx-gdb yyy.elf`：启动gdb并加载elf文件
 - `target extended-remote //./COMx`：连接GDBServer，其中COMx为串口号
@@ -42,7 +55,7 @@
 - `attach 1`：连接到设备号为1的设备
 - `load`：加载elf文件到设备中
 
-### 示例
+### 连接示例
 
 ```bash
 (gdb) target extended-remote //./COM8
@@ -67,7 +80,24 @@ Transfer rate: 32 KB/sec, 764 bytes/write.
 (gdb)
 ```
 
-详细使用方法请参考：https://black-magic.org/index.html
+### 其他常用gdb命令
+
+- `monitor <cmd>` : 向远程目标发送特定监控命令（依赖server实现）
+- `commands <index>`：自定义断点脚本
+- `break *<address>`：在程序的指定地址处设置断点
+- `print sizeof(xxxx)`: 计算变量大小
+- `dprintf main.c:122,"hello\n"`: 动态打印
+- `tbreak main` : 设置临时断点
+- `set print pretty on`: 优化显示
+- `run` 或 `r`：开始执行程序
+- `continue` 或 `c`：继续执行程序
+- `backtrace` 或 `bt`：查看当前调用堆栈
+- `set var <var>=<value>`：修改变量的值
+- `disassemble /s <address>`:  查看反汇编
+- `info locals`：显示当前函数中的局部变量
+- `info target`: 查看程序内存布局
+- `info registers`: 查看寄存器
+- `find /w 0x08000000,+0x1000,0xdeadbeef`: 遍历内存段查找特定值
 
 ## Cortex-Debug配置
 
@@ -108,3 +138,15 @@ jtag配置文件参考:
     "gdbPath": "C:/Develop_Software/gdb-multiarch-14.1/bin/gdb-multiarch.exe",
 }
 ```
+
+## 参考项目和文档
+
+- [先楫半导体hpm_sdk使用vscode进行开发](https://www.hpmicro.com/service-support/technical-articles/168)
+
+- [CheeryDAP官方仓库](https://github.com/cherry-embedded/CherryDAP)
+
+- [MicroLink官方仓库](https://github.com/Aladdin-Wang/MicroLink)
+
+- [Black Magic Debug官网](https://black-magic.org/index.html)
+
+- [GDB官方文档](https://sourceware.org/gdb/documentation/)
