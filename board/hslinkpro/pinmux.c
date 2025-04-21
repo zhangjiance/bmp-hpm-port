@@ -20,8 +20,8 @@
 #define TCK_SPI2_CLK IOC_PAD_PB11
 #define TDO_SPI2_MISO IOC_PAD_PB12
 #define TDI_SPI2_MOSI IOC_PAD_PB13
-#define TRSR IOC_PAD_PB14
-#define SRTS IOC_PAD_PB15
+#define TRST IOC_PAD_PB14
+#define SRST IOC_PAD_PB15
 #define TMS_O_SPI1_MOSI IOC_PAD_PA29
 #define TMS_I_SPI1_MISO IOC_PAD_PA28
 #define SWD_DIO_DIR IOC_PAD_PA30
@@ -40,50 +40,54 @@ void init_py_pins_as_pgpio(void)
 void init_gpio_swj_pins(void)
 {
     HPM_IOC->PAD[TCK_SPI2_CLK].FUNC_CTL = IOC_PB11_FUNC_CTL_GPIO_B_11;
+    HPM_IOC->PAD[TCK_SPI2_CLK].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 11, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 11);
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOB, 11, 1);
 
     HPM_IOC->PAD[TDO_SPI2_MISO].FUNC_CTL = IOC_PB12_FUNC_CTL_GPIO_B_12;
-    HPM_IOC->PAD[TDO_SPI2_MISO].PAD_CTL = IOC_PAD_PAD_CTL_PE_SET(0);
+    HPM_IOC->PAD[TDO_SPI2_MISO].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 12, gpiom_core0_fast);
     gpio_set_pin_input(HPM_FGPIO, GPIO_OE_GPIOB, 12);
-    gpio_disable_pin_interrupt(HPM_FGPIO, GPIO_IE_GPIOB, 12);
 
     HPM_IOC->PAD[TDI_SPI2_MOSI].FUNC_CTL = IOC_PB13_FUNC_CTL_GPIO_B_13;
+    HPM_IOC->PAD[TDI_SPI2_MOSI].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 13, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 13);
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOB, 13, 1);
 
-    HPM_IOC->PAD[TRSR].FUNC_CTL = IOC_PB14_FUNC_CTL_GPIO_B_14;
+    HPM_IOC->PAD[TRST].FUNC_CTL = IOC_PB14_FUNC_CTL_GPIO_B_14;
+    HPM_IOC->PAD[TRST].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 14, gpiom_core0_fast);
-    gpio_set_pin_input(HPM_FGPIO, GPIO_OE_GPIOB, 14);
-    gpio_disable_pin_interrupt(HPM_FGPIO, GPIO_IE_GPIOB, 14);
+    gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 14);
+    gpio_write_pin(HPM_FGPIO, GPIO_OE_GPIOB, 14, 1);
 
-    // HPM_IOC->PAD[SRTS].FUNC_CTL = IOC_PB15_FUNC_CTL_GPIO_B_15;
+    HPM_IOC->PAD[SRST].FUNC_CTL = IOC_PB15_FUNC_CTL_GPIO_B_15;
+    HPM_IOC->PAD[SRST].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
-    // gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 15, gpiom_core0_fast);
-    // gpio_set_pin_input(HPM_FGPIO, GPIO_OE_GPIOB, 15);
-    // gpio_disable_pin_interrupt(HPM_FGPIO, GPIO_IE_GPIOB, 15);
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 15, gpiom_core0_fast);
+    gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 15);
+    gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOB, 15, 1);
 
     HPM_IOC->PAD[TMS_O_SPI1_MOSI].FUNC_CTL = IOC_PA29_FUNC_CTL_GPIO_A_29;
+    HPM_IOC->PAD[TMS_O_SPI1_MOSI].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 29, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOA, 29);
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOA, 29, 0);
 
     HPM_IOC->PAD[TMS_I_SPI1_MISO].FUNC_CTL = IOC_PA28_FUNC_CTL_GPIO_A_28;
-    HPM_IOC->PAD[TMS_I_SPI1_MISO].PAD_CTL = IOC_PAD_PAD_CTL_PE_SET(0) | IOC_PAD_PAD_CTL_OD_SET(0);
+    HPM_IOC->PAD[TMS_I_SPI1_MISO].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 28, gpiom_core0_fast);
     gpio_set_pin_input(HPM_FGPIO, GPIO_OE_GPIOA, 28);
-    gpio_disable_pin_interrupt(HPM_FGPIO, GPIO_IE_GPIOA, 28);
 
     HPM_IOC->PAD[SWD_DIO_DIR].FUNC_CTL = IOC_PA30_FUNC_CTL_GPIO_A_30;
+    HPM_IOC->PAD[SWD_DIO_DIR].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 30, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOA, 30);
