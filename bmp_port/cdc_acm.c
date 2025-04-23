@@ -9,6 +9,7 @@
 #include "usbd_cdc_acm.h"
 #include "general.h"
 #include "gdb_if.h"
+#include "hpm_l1c_drv.h"
 
 #define CDC_IN_EP  0x81
 #define CDC_OUT_EP 0x01

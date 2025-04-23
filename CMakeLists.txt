@@ -8,8 +8,8 @@ set(APP_NAME "bmp-hpm-port")
 
 # set(BOARD "hslinklite")
 set(BOARD "hslinkpro")
-set(HPM_BUILD_TYPE "flash_xip")
-# set(HPM_BUILD_TYPE "flash_uf2")
+# set(HPM_BUILD_TYPE "flash_xip")
+set(HPM_BUILD_TYPE "flash_uf2")
 
 
 if(HPM_BUILD_TYPE STREQUAL "flash_uf2")
