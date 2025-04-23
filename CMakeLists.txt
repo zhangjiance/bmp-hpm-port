@@ -6,8 +6,8 @@ cmake_minimum_required(VERSION 3.13)
 
 set(APP_NAME "bmp-hpm-port")
 
-set(BOARD "hslinklite")
-# set(BOARD "hslinkpro")
+# set(BOARD "hslinklite")
+set(BOARD "hslinkpro")
 set(HPM_BUILD_TYPE "flash_xip")
 # set(HPM_BUILD_TYPE "flash_uf2")
 
@@ -40,7 +40,7 @@ add_subdirectory(bmp_port)
 # sdk_compile_definitions(-DCONFIG_NDEBUG_CONSOLE=1)
 # sdk_ses_opt_lib_io_type(RTT)
 # sdk_ses_opt_debug_connection(J-Link)
-# sdk_compile_definitions(-DUSE_NONVECTOR_MODE=1)
+sdk_compile_definitions(-DGDB_PACKET_BUFFER_SIZE=16384)
 
 sdk_compile_definitions(-DDISABLE_IRQ_PREEMPTIVE=1)
 sdk_app_src(main.c)
