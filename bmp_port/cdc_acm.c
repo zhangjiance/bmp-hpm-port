@@ -7,18 +7,24 @@
 
 #include "usbd_core.h"
 #include "usbd_cdc_acm.h"
-#include "chry_ringbuffer.h"
-#include "cdc_acm.h"
+#include "general.h"
+#include "gdb_if.h"
 
-USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t gdbout_ringbuffer[CONFIG_GDBOUT_RINGBUF_SIZE];
-USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t usbrx_ringbuffer[CONFIG_USBRX_RINGBUF_SIZE];
-USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t usb_tmpbuffer[CDC_MAX_PACKET_SIZE];
- 
-volatile uint8_t usbrx_idle_flag = 0;
-volatile uint8_t usbtx_idle_flag = 0;
+#define CDC_IN_EP  0x81
+#define CDC_OUT_EP 0x01
+#define CDC_INT_EP 0x83
 
-USB_NOCACHE_RAM_SECTION chry_ringbuffer_t g_usbrx;
-USB_NOCACHE_RAM_SECTION chry_ringbuffer_t g_gdbout;
+#define CDC_MAX_PACKET_SIZE 512
+
+#ifdef CONFIG_USB_HS
+#if CDC_MAX_PACKET_SIZE != 512
+#error "CDC_MAX_PACKET_SIZE must be 512 in hs"
+#endif
+#else
+#if CDC_MAX_PACKET_SIZE != 64
+#error "CDC_MAX_PACKET_SIZE must be 64 in fs"
+#endif
+#endif
 
 /*!< config descriptor size */
 #define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN)
@@ -112,21 +118,31 @@ const struct usb_descriptor cdc_descriptor = {
     .string_descriptor_callback = string_descriptor_callback,
 };
 
-USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t read_buffer[512];
-USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t write_buffer[2048];
-volatile bool dtr_enable;
-volatile bool ep_tx_busy_flag;
+#define USB_RX_BUFFER_SIZE 16384
+__attribute__((aligned(64))) uint8_t g_usb_write_buffer[USB_RX_BUFFER_SIZE];
+__attribute__((aligned(64))) uint8_t g_usb_read_buffer[USB_RX_BUFFER_SIZE];
+
+volatile bool g_usb_tx_busy_flag = false;
+volatile uint32_t g_usb_tx_count = 0;
+volatile uint32_t g_usb_rx_count = 0;
+volatile uint32_t g_usb_rx_offset = 0;
 
 static void usbd_event_handler(uint8_t busid, uint8_t event)
 {
     switch (event) {
     case USBD_EVENT_RESET:
-        usbrx_idle_flag = 0;
-        usbtx_idle_flag = 1;
+        g_usb_tx_busy_flag = false;
+        g_usb_rx_offset = 0;
+        g_usb_rx_count = 0;
+        g_usb_tx_count = 0;
         break;
     case USBD_EVENT_CONNECTED:
         break;
     case USBD_EVENT_DISCONNECTED:
+        g_usb_tx_busy_flag = false;
+        g_usb_rx_offset = 0;
+        g_usb_rx_count = 0;
+        g_usb_tx_count = 0;
         break;
     case USBD_EVENT_RESUME:
         break;
@@ -134,7 +150,7 @@ static void usbd_event_handler(uint8_t busid, uint8_t event)
         break;
     case USBD_EVENT_CONFIGURED:
         /* setup first out ep read transfer */
-        usbd_ep_start_read(busid, CDC_OUT_EP, &read_buffer[0], usbd_get_ep_mps(busid, CDC_OUT_EP));
+        usbd_ep_start_read(busid, CDC_OUT_EP, g_usb_read_buffer, USB_RX_BUFFER_SIZE);
         break;
     case USBD_EVENT_SET_REMOTE_WAKEUP:
         break;
@@ -149,38 +165,21 @@ static void usbd_event_handler(uint8_t busid, uint8_t event)
 void usbd_cdc_acm_bulk_out(uint8_t busid, uint8_t ep, uint32_t nbytes)
 {
     (void) busid;
-    USB_LOG_RAW("actual out len:%d\r\n", nbytes);
-    chry_ringbuffer_write(&g_usbrx, usb_tmpbuffer, nbytes);
-    if (chry_ringbuffer_get_free(&g_usbrx) >= CDC_MAX_PACKET_SIZE) {
-        usbd_ep_start_read(0, CDC_OUT_EP, usb_tmpbuffer, CDC_MAX_PACKET_SIZE);
-    }
-    else
-    {
-        usbrx_idle_flag = 1;
-    }
+
+    l1c_dc_invalidate((uint32_t)g_usb_read_buffer, USB_ALIGN_UP(nbytes, 64));
+    g_usb_rx_count = nbytes;
+    g_usb_rx_offset = 0;
 }
 
 void usbd_cdc_acm_bulk_in(uint8_t busid, uint8_t ep, uint32_t nbytes)
 {
     (void) busid;
-    uint32_t size;
-    uint8_t *buffer;
-    
-    USB_LOG_RAW("actual in len:%d\r\n", nbytes);
-    chry_ringbuffer_linear_read_done(&g_gdbout, nbytes);
-    if ((nbytes % CDC_MAX_PACKET_SIZE) == 0 && nbytes) {
+
+    if ((nbytes % usbd_get_ep_mps(busid, ep)) == 0 && nbytes) {
         /* send zlp */
-        usbd_ep_start_write(0, CDC_IN_EP, NULL, 0);
-    }
-    else {
-        if (chry_ringbuffer_get_used(&g_gdbout)) {
-            buffer = chry_ringbuffer_linear_read_setup(&g_gdbout, &size);
-            usbd_ep_start_write(0, CDC_IN_EP, buffer, size);
-        }
-        else
-        {
-            usbtx_idle_flag = 1;
-        }
+        usbd_ep_start_write(busid, CDC_IN_EP, NULL, 0);
+    } else {
+        g_usb_tx_busy_flag = false;
     }
 }
 
@@ -202,9 +201,6 @@ static struct usbd_interface intf1;
 
 void cdc_acm_init(uint8_t busid, uint32_t reg_base)
 {
-    chry_ringbuffer_init(&g_gdbout, gdbout_ringbuffer, CONFIG_GDBOUT_RINGBUF_SIZE);
-    chry_ringbuffer_init(&g_usbrx, usbrx_ringbuffer, CONFIG_USBRX_RINGBUF_SIZE);
-
     usbd_desc_register(busid, &cdc_descriptor);
     usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf0));
     usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf1));
@@ -213,12 +209,90 @@ void cdc_acm_init(uint8_t busid, uint32_t reg_base)
     usbd_initialize(busid, reg_base, usbd_event_handler);
 }
 
+volatile bool dtr_enable = false;
+
 void usbd_cdc_acm_set_dtr(uint8_t busid, uint8_t intf, bool dtr)
 {
-    (void)busid;
-    (void)intf;
-
     if (dtr) {
-        dtr_enable = 1;
+        //printf("remote attach \r\n");
+    } else {
+        //printf("remote detach \r\n");
     }
+
+    dtr_enable = dtr;
+}
+
+void gdb_if_putchar(const char c, const bool flush)
+{
+    g_usb_write_buffer[g_usb_tx_count++] = c;
+
+    if(flush)
+    {
+        g_usb_tx_busy_flag = true;
+        l1c_dc_writeback((uint32_t)g_usb_write_buffer, USB_ALIGN_UP(g_usb_tx_count, 64));
+        usbd_ep_start_write(0, CDC_IN_EP, (uint8_t *)core_local_mem_to_sys_address(0, (uint32_t)g_usb_write_buffer), g_usb_tx_count);
+        while (g_usb_tx_busy_flag) {
+        }
+        g_usb_tx_count = 0;
+    }
+}
+
+void gdb_if_flush(const bool force)
+{
+    g_usb_tx_busy_flag = true;
+    l1c_dc_writeback((uint32_t)g_usb_write_buffer, USB_ALIGN_UP(g_usb_tx_count, 64));
+    usbd_ep_start_write(0, CDC_IN_EP, (uint8_t *)core_local_mem_to_sys_address(0, (uint32_t)g_usb_write_buffer), g_usb_tx_count);
+    while (g_usb_tx_busy_flag) {
+    }
+    g_usb_tx_count = 0;
+}
+
+static int __gdb_if_getchar(void)
+{
+    if (dtr_enable == false) {
+        return '\04';
+    }
+
+    if (g_usb_rx_count > 0) {
+        if (g_usb_rx_offset < g_usb_rx_count) {
+            return g_usb_read_buffer[g_usb_rx_offset++];
+        } else {
+            g_usb_rx_count = 0;
+            /* setup first out ep read transfer */
+            usbd_ep_start_read(0, CDC_OUT_EP, g_usb_read_buffer, USB_RX_BUFFER_SIZE);
+            return -1;
+        }
+    } else {
+        return -1;
+    }
+}
+
+char gdb_if_getchar(void)
+{
+    int c;
+
+    while((c = __gdb_if_getchar()) == -1)
+    {
+
+    }
+
+    return (char)c;
+}
+
+char gdb_if_getchar_to(const uint32_t timeout)
+{
+	int c = 0;
+	platform_timeout_s receive_timeout;
+	platform_timeout_set(&receive_timeout, timeout);
+
+	/* Wait while we need more data or until the timeout expires */
+	while (!platform_timeout_is_expired(&receive_timeout))
+	{
+       c = __gdb_if_getchar();
+       if(c != -1)
+       {
+           return (char)c;
+       }
+	}
+	return -1;
 }
