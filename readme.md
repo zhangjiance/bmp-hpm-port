@@ -99,6 +99,26 @@ Transfer rate: 32 KB/sec, 764 bytes/write.
 - `info registers`: 查看寄存器
 - `find /w 0x08000000,+0x1000,0xdeadbeef`: 遍历内存段查找特定值
 
+### HPMicro-XPI调试支持
+
+本项目基于HPM平台开发，优先支持了HPM平台的XPI-FLASH调试，下载算法来自官方openocd仓库。适用于hpm平台所有芯片，已在5300系列和6800系列验证OK，其他型号用户可自行验证。
+
+用户attach到HPM芯片后，可通过`xpi_cfg`命令为rom_api传入配置参数，供下载算法使用。不执行`xpi_cfg`则使用默认参数，使用`xpi_info`可查看当前的配置参数。
+
+命令格式如下：
+
+```bash
+xpi_cfg -- <flash_base> <flash_size> <xpi_base> [opt0] [opt1]
+```
+
+5300系列示例:
+
+```bash
+monitor xpi_cfg 0x80000000 0x2000000 0xf3000000 0x6 0x1000
+```
+
+其他系列参数可参考官方openocd的配置文件。
+
 ## Cortex-Debug配置
 
 对于不习惯命令行操作gdb的用户，可以使用Cortex-Debug插件。Cortex-Debug对bmp提供了良好的支持。
@@ -139,11 +159,37 @@ jtag配置文件参考:
 }
 ```
 
+### HPM平台Cortex-Debug配置示例
+
+由于Cortex-Debug对于Launch动作默认会写ARM-CoreSight寄存器以执行软复位，HPM作为RISCV的标准实现自是无法兼容。好在Cortex-Debug预留了`overrideResetCommands`和`overrideLaunchCommands`关键字供用户自定义复位操作，因此，本文示例的配置文件，将Launch命令重写为配置Flash参数和load命令的组合，从而做到跟ARM调试一样的效果。
+
+```json
+{
+    "name": "bmp-launch",
+    "cwd": "${workspaceFolder}",
+    "executable": "build/output/demo.elf",
+    "request": "launch",
+    "type": "cortex-debug",
+    "runToEntryPoint": "main",
+    "overrideResetCommands": [],
+    "overrideLaunchCommands": [
+        "monitor xpi_cfg 0x80000000 0x2000000 0xf3000000 0x6 0x1000",
+        "load"
+    ],
+    "servertype": "bmp",
+    "interface": "jtag",
+    "BMPGDBSerialPort": "//./COM8",
+    "gdbPath": "C:/Develop_Software/gdb-multiarch-14.1/bin/gdb-multiarch.exe",
+    "svdFile":"${config:hpm_sdk_env}/hpm_sdk/soc/HPM5300/HPM5301/HPM5301_svd.xml",
+}
+```
+
+
 ## 参考项目和文档
 
 - [先楫半导体hpm_sdk使用vscode进行开发](https://www.hpmicro.com/service-support/technical-articles/168)
 
-- [CheeryDAP官方仓库](https://github.com/cherry-embedded/CherryDAP)
+- [CherryDAP官方仓库](https://github.com/cherry-embedded/CherryDAP)
 
 - [MicroLink官方仓库](https://github.com/Aladdin-Wang/MicroLink)
 
