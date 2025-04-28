@@ -96,7 +96,7 @@ sdk_src(../blackmagic/src/target/target_flash.c)
 sdk_src(../blackmagic/src/target/target_probe.c)
 sdk_src(../blackmagic/src/target/target.c)
 sdk_src(../blackmagic/src/target/zynq7000.c)
-sdk_src(../blackmagic/src/target/hpm_xip.c)
+sdk_src(../blackmagic/src/target/hpm_xpi.c)
 
 
 sdk_compile_definitions("-DCONFIG_BMDA=0")
