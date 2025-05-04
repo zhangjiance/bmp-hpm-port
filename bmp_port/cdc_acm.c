@@ -61,8 +61,8 @@ static const uint8_t other_speed_config_descriptor_fs[] = {
 static const char *string_descriptors[] = {
     (const char[]){ 0x09, 0x04 }, /* Langid */
     "HPMicro",                    /* Manufacturer */
-    "HPMicro CDC DEMO",           /* Product */
-    "2024051702",                 /* Serial Number */
+    "Black Magic Probe (HSlink) v0.2-bmp-hpm-port) ",           /* Product */
+    "2025050401",                 /* Serial Number */
 };
 
 static const uint8_t *device_descriptor_callback(uint8_t speed)

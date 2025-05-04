@@ -1,6 +1,6 @@
 #include "board.h"
 
-#define PLATFORM_IDENT "CherryBMP"
+#define PLATFORM_IDENT   "(HPMicro-5301)"
 
 #define SET_RUN_STATE(state)  \
 { \
