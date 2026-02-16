@@ -1,0 +1,149 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 13,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "hslinklite-xip-release",
+            "displayName": "HSLink Lite XIP Release",
+            "description": "Release build for HSLink Lite board with flash_xip",
+            "binaryDir": "${sourceDir}/build",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_C_COMPILER": "$env{HOME}/tools/xpack-riscv-none-elf-gcc-14.2.0-3/bin/riscv-none-elf-gcc",
+                "CMAKE_CXX_COMPILER": "$env{HOME}/tools/xpack-riscv-none-elf-gcc-14.2.0-3/bin/riscv-none-elf-g++",
+                "BOARD": "hslinklite",
+                "RV_ARCH": "rv32imac_zicsr_zifencei",
+                "HPM_BUILD_TYPE": "flash_xip",
+                "CUSTOM_TARGET_TRIPLET": "riscv-none-elf"
+            },
+            "environment": {
+                "HPM_SDK_BASE": "$env{HOME}/Code/hpm_workspace/hpm_sdk",
+                "GNURISCV_TOOLCHAIN_PATH": "$env{HOME}/tools/xpack-riscv-none-elf-gcc-14.2.0-3"
+            }
+        },
+        {
+            "name": "hslinklite-xip-debug",
+            "displayName": "HSLink Lite XIP Debug",
+            "description": "Debug build for HSLink Lite board with flash_xip",
+            "inherits": "hslinklite-xip-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "hslinklite-uf2-release",
+            "displayName": "HSLink Lite UF2 Release",
+            "description": "Release build for HSLink Lite board with flash_uf2",
+            "inherits": "hslinklite-xip-release",
+            "cacheVariables": {
+                "HPM_BUILD_TYPE": "flash_uf2"
+            }
+        },
+        {
+            "name": "hslinklite-uf2-debug",
+            "displayName": "HSLink Lite UF2 Debug",
+            "description": "Debug build for HSLink Lite board with flash_uf2",
+            "inherits": "hslinklite-xip-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "HPM_BUILD_TYPE": "flash_uf2"
+            }
+        },
+        {
+            "name": "hslinkpro-xip-release",
+            "displayName": "HSLink Pro XIP Release",
+            "description": "Release build for HSLink Pro board with flash_xip",
+            "inherits": "hslinklite-xip-release",
+            "cacheVariables": {
+                "BOARD": "hslinkpro"
+            }
+        },
+        {
+            "name": "hslinkpro-xip-debug",
+            "displayName": "HSLink Pro XIP Debug",
+            "description": "Debug build for HSLink Pro board with flash_xip",
+            "inherits": "hslinklite-xip-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BOARD": "hslinkpro"
+            }
+        },
+        {
+            "name": "hslinkpro-uf2-release",
+            "displayName": "HSLink Pro UF2 Release",
+            "description": "Release build for HSLink Pro board with flash_uf2",
+            "inherits": "hslinklite-xip-release",
+            "cacheVariables": {
+                "BOARD": "hslinkpro",
+                "HPM_BUILD_TYPE": "flash_uf2"
+            }
+        },
+        {
+            "name": "hslinkpro-uf2-debug",
+            "displayName": "HSLink Pro UF2 Debug",
+            "description": "Debug build for HSLink Pro board with flash_uf2",
+            "inherits": "hslinklite-xip-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BOARD": "hslinkpro",
+                "HPM_BUILD_TYPE": "flash_uf2"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "hslinklite-xip-release",
+            "displayName": "Build HSLink Lite XIP Release",
+            "configurePreset": "hslinklite-xip-release",
+            "jobs": 8
+        },
+        {
+            "name": "hslinklite-xip-debug",
+            "displayName": "Build HSLink Lite XIP Debug",
+            "configurePreset": "hslinklite-xip-debug",
+            "jobs": 8
+        },
+        {
+            "name": "hslinklite-uf2-release",
+            "displayName": "Build HSLink Lite UF2 Release",
+            "configurePreset": "hslinklite-uf2-release",
+            "jobs": 8
+        },
+        {
+            "name": "hslinklite-uf2-debug",
+            "displayName": "Build HSLink Lite UF2 Debug",
+            "configurePreset": "hslinklite-uf2-debug",
+            "jobs": 8
+        },
+        {
+            "name": "hslinkpro-xip-release",
+            "displayName": "Build HSLink Pro XIP Release",
+            "configurePreset": "hslinkpro-xip-release",
+            "jobs": 8
+        },
+        {
+            "name": "hslinkpro-xip-debug",
+            "displayName": "Build HSLink Pro XIP Debug",
+            "configurePreset": "hslinkpro-xip-debug",
+            "jobs": 8
+        },
+        {
+            "name": "hslinkpro-uf2-release",
+            "displayName": "Build HSLink Pro UF2 Release",
+            "configurePreset": "hslinkpro-uf2-release",
+            "jobs": 8
+        },
+        {
+            "name": "hslinkpro-uf2-debug",
+            "displayName": "Build HSLink Pro UF2 Debug",
+            "configurePreset": "hslinkpro-uf2-debug",
+            "jobs": 8
+        }
+    ]
+}
