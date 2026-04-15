@@ -1,3 +1,4 @@
 [submodule "blackmagic"]
 	path = blackmagic
-	url = https://github.com/zhangjiance/blackmagic.git
+	url = https://codeberg.org/mTOTm/blackmagic.git
+	branch = dev/jiance.zhang/main_test
