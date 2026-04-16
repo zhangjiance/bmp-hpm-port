@@ -15,15 +15,14 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_C_COMPILER": "$env{HOME}/tools/xpack-riscv-none-elf-gcc-14.2.0-3/bin/riscv-none-elf-gcc",
-                "CMAKE_CXX_COMPILER": "$env{HOME}/tools/xpack-riscv-none-elf-gcc-14.2.0-3/bin/riscv-none-elf-g++",
-                "RV_ARCH": "rv32imac_zicsr_zifencei",
+                "CMAKE_C_COMPILER": "$env{HOME}/Code/tools/xpack-riscv-none-elf-gcc-15.2.0-1/bin/riscv-none-elf-gcc",
+                "CMAKE_CXX_COMPILER": "$env{HOME}/Code/tools/xpack-riscv-none-elf-gcc-15.2.0-1/bin/riscv-none-elf-g++",
                 "HPM_BUILD_TYPE": "flash_xip",
                 "CUSTOM_TARGET_TRIPLET": "riscv-none-elf"
             },
             "environment": {
-                "HPM_SDK_BASE": "$env{HOME}/Code/hpm_workspace/hpm_sdk",
-                "GNURISCV_TOOLCHAIN_PATH": "$env{HOME}/tools/xpack-riscv-none-elf-gcc-14.2.0-3"
+                "HPM_SDK_BASE": "$env{HOME}/Code/SDK/hpm_sdk",
+                "GNURISCV_TOOLCHAIN_PATH": "$env{HOME}/Code/tools/xpack-riscv-none-elf-gcc-15.2.0-1"
             }
         },
         {

@@ -17,7 +17,7 @@ set(CUSTOM_GCC_LINKER_FILE
 )
 endif()
 
-# set(CONFIG_SEGGER_RTT 1)
+set(CONFIG_SEGGER_RTT 1)
 set(CONFIG_CHERRYRB 1)
 set(CONFIG_CHERRYUSB 1)
 set(CONFIG_USB_DEVICE 1)
@@ -39,6 +39,7 @@ sdk_compile_definitions(-DGDB_PACKET_BUFFER_SIZE=16384)
 
 sdk_compile_definitions(-DDISABLE_IRQ_PREEMPTIVE=1)
 sdk_app_src(main.c)
+sdk_app_src(uf2_signature.c)
 
 # generate_ide_projects()
 

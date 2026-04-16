@@ -1,0 +1,47 @@
+cmake_minimum_required(VERSION 3.13)
+
+set(APP_NAME hpm-simple-dfu-boot)
+set(BOARD_SEARCH_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../board)
+
+# RISC-V architecture with CSR and fence extensions
+set(RV_ARCH "rv32imac_zicsr_zifencei")
+set(RV_ABI "ilp32")
+
+# Bootloader linker script
+set(CUSTOM_GCC_LINKER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/flash_boot.ld)
+set(HEAP_SIZE 0x800)
+set(STACK_SIZE 0x2000)
+
+# Enable Cherry USB (DFU only)
+set(CONFIG_CHERRYUSB 1)
+set(CONFIG_USB_DEVICE 1)
+set(CONFIG_USB_DEVICE_DFU 1)
+
+# Find HPM SDK
+find_package(hpm-sdk REQUIRED HINTS $ENV{HPM_SDK_BASE})
+project(hpm_simple_dfu_boot)
+
+# Include CherryUSB DFU class
+sdk_inc($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu)
+
+# Include paths
+sdk_inc(.)
+sdk_inc(port)
+
+# Source files (simplified - DFU only)
+sdk_app_src(simple_main.c)
+sdk_app_src(simple_dfu_desc.c)
+sdk_app_src(port/hpm/boot_flash_port_hpm.c)
+sdk_app_src(port/hpm/boot_port_hpm.c)
+sdk_app_src(port/hpm/boot_port_board_hpm.c)
+
+# Add DFU class source
+sdk_app_src($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu/usbd_dfu.c)
+
+# Compile definitions
+sdk_compile_definitions(-DCONFIG_USB_HS=0)
+sdk_compile_definitions(-DBOARD_UF2_SIGNATURE=0x0A4D5048)
+sdk_compile_definitions(-DUSBD_DFU_XFER_SIZE=1024)
+sdk_compile_definitions(-DUSBD_DFU_APP_DEFAULT_ADD=0x80020000)
+
+generate_ses_project(${APP_NAME})

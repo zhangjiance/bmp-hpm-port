@@ -1,0 +1,91 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 13,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base-boot",
+            "hidden": true,
+            "description": "Base preset for UF2 bootloader",
+            "binaryDir": "${sourceDir}/build",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_C_COMPILER": "$env{HOME}/Code/tools/xpack-riscv-none-elf-gcc-15.2.0-1/bin/riscv-none-elf-gcc",
+                "CMAKE_CXX_COMPILER": "$env{HOME}/Code/tools/xpack-riscv-none-elf-gcc-15.2.0-1/bin/riscv-none-elf-g++",
+                "HPM_BUILD_TYPE": "flash_xip",
+                "CUSTOM_TARGET_TRIPLET": "riscv-none-elf"
+            },
+            "environment": {
+                "HPM_SDK_BASE": "$env{HOME}/Code/SDK/hpm_sdk",
+                "GNURISCV_TOOLCHAIN_PATH": "$env{HOME}/Code/tools/xpack-riscv-none-elf-gcc-15.2.0-1"
+            }
+        },
+        {
+            "name": "hslinklite-boot",
+            "displayName": "HSLink Lite UF2 Bootloader",
+            "description": "UF2 Bootloader for HSLink Lite (128KB @ 0x80000000)",
+            "inherits": "base-boot",
+            "cacheVariables": {
+                "BOARD": "hslinklite"
+            }
+        },
+        {
+            "name": "hslinklite-boot-debug",
+            "displayName": "HSLink Lite UF2 Bootloader (Debug)",
+            "description": "UF2 Bootloader for HSLink Lite with debug symbols",
+            "inherits": "hslinklite-boot",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "hslinkpro-boot",
+            "displayName": "HSLink Pro UF2 Bootloader",
+            "description": "UF2 Bootloader for HSLink Pro (128KB @ 0x80000000)",
+            "inherits": "base-boot",
+            "cacheVariables": {
+                "BOARD": "hslinkpro"
+            }
+        },
+        {
+            "name": "hslinkpro-boot-debug",
+            "displayName": "HSLink Pro UF2 Bootloader (Debug)",
+            "description": "UF2 Bootloader for HSLink Pro with debug symbols",
+            "inherits": "hslinkpro-boot",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "hslinklite-boot",
+            "displayName": "Build HSLink Lite Bootloader",
+            "configurePreset": "hslinklite-boot",
+            "jobs": 8
+        },
+        {
+            "name": "hslinklite-boot-debug",
+            "displayName": "Build HSLink Lite Bootloader (Debug)",
+            "configurePreset": "hslinklite-boot-debug",
+            "jobs": 8
+        },
+        {
+            "name": "hslinkpro-boot",
+            "displayName": "Build HSLink Pro Bootloader",
+            "configurePreset": "hslinkpro-boot",
+            "jobs": 8
+        },
+        {
+            "name": "hslinkpro-boot-debug",
+            "displayName": "Build HSLink Pro Bootloader (Debug)",
+            "configurePreset": "hslinkpro-boot-debug",
+            "jobs": 8
+        }
+    ]
+}

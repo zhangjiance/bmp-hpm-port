@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebUSB DFU</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font: 18px/1.6 sans-serif;
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        body > * {
+            background: #fff;
+            border-radius: 12px;
+            padding: 35px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, .2);
+        }
+        
+        h2 {
+            margin: 0 0 25px;
+            text-align: center;
+            font-size: 32px;
+        }
+        
+        p {
+            margin: 0 0 20px;
+            font-size: 16px;
+        }
+        
+        button, input {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            margin: 16px 0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font: inherit;
+            font-size: 18px;
+        }
+        
+        button {
+            background: #007bff;
+            color: #fff;
+            cursor: pointer;
+            border: 0;
+            font-weight: 500;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+        
+        input[type=file] {
+            padding: 12px;
+        }
+        
+        #p, #l {
+            display: none;
+        }
+        
+        #p {
+            height: 38px;
+            background: #eee;
+            margin: 16px 0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        #p div {
+            height: 100%;
+            background: #28a745;
+            width: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            transition: width .3s;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        #l {
+            font: 14px monospace;
+            max-height: 220px;
+            overflow-y: auto;
+            background: #f5f5f5;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 6px;
+            line-height: 1.6;
+        }
+        
+        .e {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h2>⚡ WebUSB DFU</h2>
+        <p><small>Chrome 61+ | 1.Connect 2.Select .bin 3.Download</small></p>
+        <button id="c">🔌 Connect to Device</button>
+        <input type="file" id="f" accept=".bin,.dfu">
+        <button id="d" disabled>⬇️ Download Firmware</button>
+        <div id="p"><div id="b">0%</div></div>
+        <div id="l"></div>
+    </div>
+    
+    <script>
+        var dfu = {};
+        !function() {
+            'use strict';
+            
+            dfu.DETACH = 0;
+            dfu.DNLOAD = 1;
+            dfu.UPLOAD = 2;
+            dfu.GETSTATUS = 3;
+            dfu.CLRSTATUS = 4;
+            dfu.GETSTATE = 5;
+            dfu.ABORT = 6;
+            
+            dfu.appIDLE = 0;
+            dfu.appDETACH = 1;
+            dfu.dfuIDLE = 2;
+            dfu.dfuDNLOAD_SYNC = 3;
+            dfu.dfuDNBUSY = 4;
+            dfu.dfuDNLOAD_IDLE = 5;
+            dfu.dfuMANIFEST_SYNC = 6;
+            dfu.dfuMANIFEST = 7;
+            dfu.dfuMANIFEST_WAIT_RESET = 8;
+            dfu.dfuUPLOAD_IDLE = 9;
+            dfu.dfuERROR = 10;
+            
+            dfu.STATUS_OK = 0;
+            
+            dfu.Device = function(device, settings) {
+                this.device_ = device;
+                this.settings = settings;
+                this.intfNumber = settings.interface.interfaceNumber;
+            };
+            
+            dfu.findDeviceDfuInterfaces = function(device) {
+                let interfaces = [];
+                for (let conf of device.configurations) {
+                    for (let intf of conf.interfaces) {
+                        for (let alt of intf.alternates) {
+                            if (alt.interfaceClass == 0xFE &&
+                                alt.interfaceSubclass == 0x01 &&
+                                (alt.interfaceProtocol == 0x01 || alt.interfaceProtocol == 0x02)) {
+                                interfaces.push({
+                                    configuration: conf,
+                                    interface: intf,
+                                    alternate: alt,
+                                    name: alt.interfaceName
+                                });
+                            }
+                        }
+                    }
+                }
+                return interfaces;
+            };
+            
+            dfu.Device.prototype.logDebug = function(msg) {};
+            dfu.Device.prototype.logInfo = function(msg) { console.log(msg); };
+            dfu.Device.prototype.logWarning = function(msg) { console.log(msg); };
+            dfu.Device.prototype.logError = function(msg) { console.log(msg); };
+            dfu.Device.prototype.logProgress = function(done, total) {};
+            
+            dfu.Device.prototype.open = async function() {
+                await this.device_.open();
+                const confValue = this.settings.configuration.configurationValue;
+                if (this.device_.configuration === null ||
+                    this.device_.configuration.configurationValue != confValue) {
+                    await this.device_.selectConfiguration(confValue);
+                }
+                
+                const intfNumber = this.settings.interface.interfaceNumber;
+                if (!this.device_.configuration.interfaces[intfNumber].claimed) {
+                    await this.device_.claimInterface(intfNumber);
+                }
+                
+                const altSetting = this.settings.alternate.alternateSetting;
+                let intf = this.device_.configuration.interfaces[intfNumber];
+                if (intf.alternate === null ||
+                    intf.alternate.alternateSetting != altSetting ||
+                    intf.alternates.length > 1) {
+                    try {
+                        await this.device_.selectAlternateInterface(intfNumber, altSetting);
+                    } catch (error) {
+                        if (intf.alternate.alternateSetting != altSetting ||
+                            !error.endsWith("Unable to set device interface.")) {
+                            throw error;
+                        }
+                        this.logWarning("Redundant SET_INTERFACE request failed");
+                    }
+                }
+            };
+            
+            dfu.Device.prototype.close = async function() {
+                try {
+                    await this.device_.close();
+                } catch (error) {
+                    console.log(error);
+                }
+            };
+            
+            dfu.Device.prototype.requestOut = function(bRequest, data, wValue = 0) {
+                return this.device_.controlTransferOut({
+                    requestType: 'class',
+                    recipient: 'interface',
+                    request: bRequest,
+                    value: wValue,
+                    index: this.intfNumber
+                }, data).then(
+                    result => (result.status == 'ok') ? Promise.resolve(result.bytesWritten) : Promise.reject(result.status),
+                    error => Promise.reject("ControlTransferOut failed: " + error)
+                );
+            };
+            
+            dfu.Device.prototype.requestIn = function(bRequest, length, wValue = 0) {
+                return this.device_.controlTransferIn({
+                    requestType: 'class',
+                    recipient: 'interface',
+                    request: bRequest,
+                    value: wValue,
+                    index: this.intfNumber
+                }, length).then(
+                    result => (result.status == 'ok') ? Promise.resolve(result.data) : Promise.reject(result.status),
+                    error => Promise.reject("ControlTransferIn failed: " + error)
+                );
+            };
+            
+            dfu.Device.prototype.download = function(data, blockNum) {
+                return this.requestOut(dfu.DNLOAD, data, blockNum);
+            };
+            
+            dfu.Device.prototype.clearStatus = function() {
+                return this.requestOut(dfu.CLRSTATUS);
+            };
+            
+            dfu.Device.prototype.getStatus = function() {
+                return this.requestIn(dfu.GETSTATUS, 6).then(
+                    data => Promise.resolve({
+                        status: data.getUint8(0),
+                        pollTimeout: data.getUint32(1, true) & 0xFFFFFF,
+                        state: data.getUint8(4)
+                    }),
+                    error => Promise.reject("DFU GETSTATUS failed: " + error)
+                );
+            };
+            
+            dfu.Device.prototype.getState = function() {
+                return this.requestIn(dfu.GETSTATE, 1).then(
+                    data => Promise.resolve(data.getUint8(0)),
+                    error => Promise.reject("DFU GETSTATE failed: " + error)
+                );
+            };
+            
+            dfu.Device.prototype.abort = function() {
+                return this.requestOut(dfu.ABORT);
+            };
+            
+            dfu.Device.prototype.abortToIdle = async function() {
+                await this.abort();
+                let state = await this.getState();
+                if (state == dfu.dfuERROR) {
+                    await this.clearStatus();
+                    state = await this.getState();
+                }
+                if (state != dfu.dfuIDLE) {
+                    throw "Failed to return to idle state after abort: state " + state;
+                }
+            };
+            
+            dfu.Device.prototype.poll_until = async function(statePredicate) {
+                let status = await this.getStatus();
+                
+                function sleep(ms) {
+                    return new Promise(function(resolve, reject) {
+                        setTimeout(resolve, ms);
+                    });
+                }
+                
+                while (!statePredicate(status.state) && status.state != dfu.dfuERROR) {
+                    await sleep(status.pollTimeout);
+                    status = await this.getStatus();
+                }
+                
+                return status;
+            };
+            
+            dfu.Device.prototype.poll_until_idle = function(idle_state) {
+                return this.poll_until(state => state == idle_state);
+            };
+            
+            dfu.Device.prototype.do_download = async function(xfer_size, data, manifestationTolerant) {
+                let bytes_sent = 0;
+                let expected_size = data.byteLength;
+                /*
+                 * CherryUSB DFU implementation treats block 0/1 as command space.
+                 * Firmware payload must start from block #2.
+                 */
+                let transaction = 2;
+                
+                this.logInfo("Downloading firmware");
+                this.logProgress(0, expected_size);
+                
+                while (bytes_sent < expected_size) {
+                    const bytes_to_send = Math.min(expected_size - bytes_sent, xfer_size);
+                    let bytes_written = 0;
+                    let status;
+                    
+                    try {
+                        bytes_written = await this.download(data.slice(bytes_sent, bytes_sent + bytes_to_send), transaction++);
+                        status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
+                    } catch (error) {
+                        throw "Error during DFU download: " + error;
+                    }
+                    
+                    if (status.status != dfu.STATUS_OK) {
+                        throw `DFU DOWNLOAD failed state=${status.state}, status=${status.status}`;
+                    }
+                    
+                    bytes_sent += bytes_written;
+                    this.logProgress(bytes_sent, expected_size);
+                }
+                
+                try {
+                    await this.download(new ArrayBuffer([]), transaction++);
+                } catch (error) {
+                    throw "Error during final DFU download: " + error;
+                }
+                
+                this.logInfo("Wrote " + bytes_sent + " bytes");
+                this.logInfo("Manifesting new firmware");
+                
+                if (manifestationTolerant) {
+                    let status;
+                    try {
+                        status = await this.poll_until(state => (state == dfu.dfuIDLE || state == dfu.dfuMANIFEST_WAIT_RESET));
+                        if (status.status != dfu.STATUS_OK) {
+                            throw `DFU MANIFEST failed state=${status.state}, status=${status.status}`;
+                        }
+                    } catch (error) {
+                        if (!error.endsWith("ControlTransferIn failed: NotFoundError: Device unavailable.") &&
+                            !error.endsWith("ControlTransferIn failed: NotFoundError: The device was disconnected.")) {
+                            throw "Error during DFU manifest: " + error;
+                        }
+                        this.logWarning("Unable to poll final manifestation status");
+                    }
+                } else {
+                    try {
+                        await this.getStatus();
+                    } catch (error) {}
+                }
+                
+                try {
+                    await this.device_.reset();
+                } catch (error) {
+                    const err = error.toString();
+                    if (!err.includes("Unable to reset") &&
+                        !err.includes("NetworkError") &&
+                        !err.includes("Device unavailable") &&
+                        !err.includes("disconnected")) {
+                        throw "Error during reset for manifestation: " + error;
+                    }
+                    this.logWarning("Device reset complete (expected disconnection)");
+                }
+            };
+        }();
+        
+        var dev = null, fw = null;
+        const DFU_VID = 0xFFFF;
+        const DFU_PID = 0xFFFF;
+        const cb = document.getElementById('c');
+        const db = document.getElementById('d');
+        const fi = document.getElementById('f');
+        const pc = document.getElementById('p');
+        const pb = document.getElementById('b');
+        const lg = document.getElementById('l');
+        
+        function log(msg, isError) {
+            const div = document.createElement('div');
+            div.className = isError ? 'e' : '';
+            div.textContent = msg;
+            lg.appendChild(div);
+            lg.scrollTop = lg.scrollHeight;
+            lg.style.display = 'block';
+        }
+        
+        cb.addEventListener('click', async () => {
+            try {
+                let device = null;
+                log('🔍 Requesting preferred device list (VID=0xFFFF, PID=0xFFFF)...');
+                try {
+                    device = await navigator.usb.requestDevice({
+                        filters: [{ vendorId: DFU_VID, productId: DFU_PID }]
+                    });
+                } catch (error) {
+                    if (error && error.name === 'NotFoundError') {
+                        log('⚠️ Preferred VID/PID not selected, falling back to full device list...');
+                        device = await navigator.usb.requestDevice({ filters: [] });
+                    } else {
+                        throw error;
+                    }
+                }
+
+                if (device.vendorId === DFU_VID && device.productId === DFU_PID) {
+                    log('✅ Selected preferred VID/PID device');
+                } else {
+                    const vid = '0x' + device.vendorId.toString(16).padStart(4, '0').toUpperCase();
+                    const pid = '0x' + device.productId.toString(16).padStart(4, '0').toUpperCase();
+                    log('ℹ️ Selected fallback device: VID=' + vid + ', PID=' + pid);
+                }
+
+                const interfaces = dfu.findDeviceDfuInterfaces(device);
+                
+                if (interfaces.length === 0) {
+                    throw new Error('No DFU interface found. Set BOOT0=HIGH and reconnect!');
+                }
+                
+                console.log('Found DFU interfaces:', interfaces);
+                dev = new dfu.Device(device, interfaces[0]);
+                await dev.open();
+                
+                log('✅ Connected: ' + (device.productName || 'DFU Device'));
+                log('📍 Interface #' + interfaces[0].interface.interfaceNumber + ': ' + (interfaces[0].name || 'DFU'));
+                
+                cb.textContent = '✅ Connected';
+                cb.disabled = true;
+                db.disabled = (fw === null);
+            } catch (error) {
+                log('❌ Connection failed: ' + error.message, true);
+            }
+        });
+        
+        fi.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    fw = e.target.result;
+                    db.disabled = (dev === null);
+                    log('📦 Loaded: ' + file.name + ' (' + (file.size / 1024).toFixed(1) + 'KB)');
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+        
+        db.addEventListener('click', async () => {
+            if (!dev || !fw) {
+                return void log('⚠️ Please connect device and select firmware', true);
+            }
+            
+            if (!dev.device_.opened) {
+                return void log('❌ Device not connected properly. Please reconnect.', true);
+            }
+            
+            try {
+                db.disabled = true;
+                pc.style.display = 'block';
+                pb.textContent = 'Preparing...';
+                log('⚡ Starting firmware download...');
+                log('🔄 Preparing device...');
+                
+                try {
+                    await dev.abortToIdle();
+                } catch (err) {
+                    log('⚠️ Device reset: ' + err);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                dev.logInfo = msg => log(msg);
+                dev.logError = msg => log(msg, true);
+                dev.logWarning = msg => log(msg);
+                dev.logProgress = (done, total) => {
+                    if (total) {
+                        const pct = Math.round(done / total * 100);
+                        pb.textContent = '📝 Writing ' + pct + '%';
+                        pb.style.width = pct + '%';
+                    }
+                };
+                
+                await dev.do_download(512, fw, false);
+                
+                log('✅ Firmware downloaded successfully!');
+                log('🔄 Device is resetting...');
+                pb.style.width = '100%';
+                pb.textContent = '✅ Complete';
+            } catch (error) {
+                const err = error.toString();
+                if (err.includes('transfer error') ||
+                    err.includes('Device unavailable') ||
+                    err.includes('reset') ||
+                    err.includes('disconnected')) {
+                    log('✅ Firmware downloaded successfully!');
+                    log('🔄 Device has reset (normal behavior)');
+                    pb.style.width = '100%';
+                    pb.textContent = '✅ Complete';
+                } else {
+                    log('❌ Download failed: ' + error, true);
+                    db.disabled = false;
+                }
+            }
+        });
+        
+        if (navigator.usb) {
+            log('✅ WebUSB ready (Chrome 61+)');
+            log('🎯 Device filter: VID=0xFFFF PID=0xFFFF');
+            log('ℹ️ Set BOOT0=HIGH, connect device');
+        } else {
+            log('❌ WebUSB not supported', true);
+            cb.disabled = true;
+        }
+    </script>
+</body>
+</html>
