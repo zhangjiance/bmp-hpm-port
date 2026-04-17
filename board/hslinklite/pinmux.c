@@ -174,6 +174,27 @@ void init_spi2_jtag_pins(void) {
   gpio_write_pin(HPM_GPIO0, GPIO_DO_GPIOA, 29, 0);
 }
 
+/* Disable UART2 pins (PA08/PA09) - configure as floating GPIO input */
+void uninit_uart2_pins(void) {
+    /* Configure PA08 (UART2_TXD) as floating GPIO input */
+    HPM_IOC->PAD[IOC_PAD_PA08].FUNC_CTL = IOC_PA08_FUNC_CTL_GPIO_A_08;
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 8, gpiom_soc_gpio0);
+    gpio_set_pin_input(HPM_GPIO0, GPIO_OE_GPIOA, 8);
+    
+    /* Configure PA09 (UART2_RXD) as floating GPIO input */
+    HPM_IOC->PAD[IOC_PAD_PA09].FUNC_CTL = IOC_PA09_FUNC_CTL_GPIO_A_09;
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 9, gpiom_soc_gpio0);
+    gpio_set_pin_input(HPM_GPIO0, GPIO_OE_GPIOA, 9);
+}
+
+/* Disable JTAG TDI pin (PB13) - configure as floating GPIO input */
+void uninit_jtag_tdi_pin(void) {
+    /* Configure PB13 (TDI/SPI2_MOSI) as floating GPIO input */
+    HPM_IOC->PAD[IOC_PAD_PB13].FUNC_CTL = IOC_PB13_FUNC_CTL_GPIO_B_13;
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 13, gpiom_soc_gpio0);
+    gpio_set_pin_input(HPM_GPIO0, GPIO_OE_GPIOB, 13);
+}
+
 void init_uart_pins(UART_Type *ptr) {
     if (ptr == HPM_UART0) {
         HPM_IOC->PAD[IOC_PAD_PA01].FUNC_CTL = IOC_PA01_FUNC_CTL_UART0_RXD;

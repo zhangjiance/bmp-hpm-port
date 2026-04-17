@@ -1,6 +1,7 @@
 #include "board.h"
 
 #define PLATFORM_IDENT   "(HPMicro-5301)"
+#define PLATFORM_HAS_CUSTOM_COMMANDS
 
 #define SET_RUN_STATE(state)  \
 { \

@@ -12,6 +12,10 @@
 #include "rtt_if.h"
 #include "platform.h"
 
+/* Debug: track RTT data flow */
+static uint32_t rtt_write_total = 0;
+static uint32_t rtt_read_total = 0;
+
 /* RTT transfer buffers */
 static char rtt_up_buffer[RTT_UP_BUF_SIZE];
 static char rtt_down_buffer[RTT_DOWN_BUF_SIZE];
@@ -41,7 +45,8 @@ int rtt_if_exit(void)
 /* Write len bytes from target to host (USB) */
 uint32_t rtt_write(const uint32_t channel, const char *buf, uint32_t len)
 {
-    if (channel != 0 || !buf || len == 0)
+    /* Accept all channels - we merge them into one USB stream */
+    if (!buf || len == 0)
         return 0;
     
     uint32_t written = 0;
@@ -59,7 +64,10 @@ uint32_t rtt_write(const uint32_t channel, const char *buf, uint32_t len)
         written++;
     }
     
-    /* TODO: Trigger USB transfer if data available */
+    if (written > 0)
+        rtt_write_total += written;
+    
+    /* Note: Data will be sent to USB in aux_serial_uart_poll() main loop */
     
     return written;
 }
@@ -67,8 +75,8 @@ uint32_t rtt_write(const uint32_t channel, const char *buf, uint32_t len)
 /* Read one character from host to target (USB to target) */
 int32_t rtt_getchar(const uint32_t channel)
 {
-    if (channel != 0)
-        return -1;
+    /* We only support one down channel merged from USB */
+    (void)channel;
     
     /* Check if data available */
     if (rtt_down_read_index == rtt_down_write_index)
@@ -83,8 +91,8 @@ int32_t rtt_getchar(const uint32_t channel)
 /* Check if no data available for reading */
 bool rtt_nodata(const uint32_t channel)
 {
-    if (channel != 0)
-        return true;
+    /* We only support one down channel */
+    (void)channel;
     
     return (rtt_down_read_index == rtt_down_write_index);
 }
@@ -111,6 +119,8 @@ uint32_t rtt_read_buffer(char *buf, uint32_t max_len)
         rtt_up_read_index = (rtt_up_read_index + 1) % RTT_UP_BUF_SIZE;
     }
     
+    rtt_read_total += read;
+    
     return read;
 }
 
@@ -135,4 +145,15 @@ uint32_t rtt_write_buffer(const char *buf, uint32_t len)
     }
     
     return written;
+}
+
+/* Debug functions to track data flow */
+uint32_t rtt_get_write_total(void)
+{
+    return rtt_write_total;
+}
+
+uint32_t rtt_get_read_total(void)
+{
+    return rtt_read_total;
 }

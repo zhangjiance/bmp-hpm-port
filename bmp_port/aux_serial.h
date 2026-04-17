@@ -20,6 +20,9 @@ void aux_serial_init(void);
 /* Enable UART pins (PA08/PA09) - call only in SWD mode to avoid JTAG conflict */
 void aux_serial_enable_pins(void);
 
+/* Disable UART pins - call when switching to JTAG mode */
+void aux_serial_disable_pins(void);
+
 /* Check if UART pins are enabled */
 bool aux_serial_pins_enabled(void);
 

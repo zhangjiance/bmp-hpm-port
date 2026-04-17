@@ -18,6 +18,10 @@ int platform_hwversion(void)
 
 void platform_init(void)
 {
+	/* Default to JTAG mode on startup - just disable UART to avoid pin conflict */
+	/* Note: board_init() already calls init_gpio_swj_pins() for GPIO-based JTAG/SWD */
+	extern void uninit_uart2_pins(void);
+	uninit_uart2_pins();     /* Ensure UART pins (PA08/PA09) are floating */
 }
 
 void platform_nrst_set_val(bool assert)

@@ -28,6 +28,8 @@
  void init_pwm_pins(void);
  void init_spi1_swd_pins(void);
  void init_spi2_jtag_pins(void);
+ void uninit_uart2_pins(void);
+ void uninit_jtag_tdi_pin(void);
  void init_uart_pins(UART_Type *ptr);
  void init_usb_pins(USB_Type *ptr) ;
  void init_gptmr_channel_pin(GPTMR_Type *ptr, uint32_t channel, bool as_comp);

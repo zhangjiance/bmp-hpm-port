@@ -8,6 +8,7 @@ sdk_src(platform.c)
 sdk_src(cdc_acm_dual.c)      # Dual CDC (GDB + UART) + RTT
 sdk_src(aux_serial.c)         # UART serial pass-through
 sdk_src(rtt_if.c)             # RTT transfer support
+sdk_src(rtt_debug.c)          # RTT debug commands
 
 # sdk_src(gdb_if.c)
 sdk_src(swdptap.c)
@@ -118,4 +119,5 @@ sdk_compile_definitions("-DUSB_HS")
 sdk_compile_definitions("-DADVERTISE_NOACKMODE=1")
 sdk_compile_definitions("-DCONFIG_RISCV=1")
 sdk_compile_definitions("-DCONFIG_RISCV_ACCEL=1")
+sdk_compile_definitions("-DENABLE_RTT=1")
 # sdk_compile_definitions("-DENABLE_DEBUG=1")

@@ -66,6 +66,8 @@ static void bmp_poll_loop(void)
 		if (rtt_enabled)
 			poll_rtt(cur_target);
 #endif
+		/* Poll UART/RTT to transfer data to USB while target is running */
+		aux_serial_uart_poll();
 	}
 
 	SET_IDLE_STATE(true);
@@ -79,14 +81,15 @@ static void bmp_poll_loop(void)
 
 int main(void) {
   board_init();
+  platform_init();  /* Initialize JTAG pins as default mode */
   board_init_usb((USB_Type *)CONFIG_HPM_USBD_BASE);
   intc_set_irq_priority(CONFIG_HPM_USBD_IRQn, 2);
   cdc_acm_init(0, (uint32_t)HPM_USB0);
   board_timer_create(50, board_timer_process);
 
   while (true) {
-    /* Poll UART RX and transfer to USB (only in UART mode) - DISABLED */
-    // aux_serial_uart_poll();
+    /* Poll UART RX and transfer to USB (only in UART mode) */
+    aux_serial_uart_poll();
     
     TRY(EXCEPTION_ALL) { bmp_poll_loop(); }
     CATCH() {

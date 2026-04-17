@@ -45,6 +45,12 @@ void jtagtap_init(void)
 {
 	platform_target_clk_output_enable(true);
 
+	/* Ensure UART is disabled in JTAG mode */
+	extern void aux_serial_disable_pins(void);
+	aux_serial_disable_pins();   /* Disable UART2 (PA08/PA09) to avoid conflict */
+	
+	/* Note: GPIO JTAG pins already configured by board_init() -> init_gpio_swj_pins() */
+
 	jtag_proc.jtagtap_reset = jtagtap_reset;
 	jtag_proc.jtagtap_next = jtagtap_next;
 	jtag_proc.jtagtap_tms_seq = jtagtap_tms_seq;

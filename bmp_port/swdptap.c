@@ -54,6 +54,15 @@ static void swdptap_seq_out_parity(uint32_t tms_states, size_t clock_cycles) __a
 
 void swdptap_init(void)
 {
+	/* Enable UART in SWD mode (TDI pin not used) */
+	extern void aux_serial_enable_pins(void);
+	extern void uninit_jtag_tdi_pin(void);
+	
+	aux_serial_enable_pins();   /* Enable UART2 pins (PA08/PA09) - safe in SWD mode */
+	uninit_jtag_tdi_pin();      /* Disable TDI (PB13) to avoid conflict with UART */
+	
+	/* Note: GPIO SWD pins already configured by board_init() -> init_gpio_swj_pins() */
+
 	swd_proc.seq_in = swdptap_seq_in;
 	swd_proc.seq_in_parity = swdptap_seq_in_parity;
 	swd_proc.seq_out = swdptap_seq_out;

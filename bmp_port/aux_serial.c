@@ -56,7 +56,59 @@ void aux_serial_init(void)
 
 void aux_serial_enable_pins(void)
 {
-    /* STUB - do nothing, UART hardware completely disabled */
+    if (uart_pins_configured)
+        return;
+    
+    /* Initialize UART2 hardware when user opens the port */
+    uart_config_t config = {0};
+    
+    /* Configure pins first */
+    board_init_uart(AUX_UART);
+    
+    /* Configure UART */
+    uart_default_config(AUX_UART, &config);
+    config.baudrate = aux_line_coding.dwDTERate;
+    config.num_of_stop_bits = (aux_line_coding.bCharFormat == 0) ? stop_bits_1 : stop_bits_2;
+    config.word_length = (aux_line_coding.bDataBits == 8) ? word_length_8_bits : word_length_7_bits;
+    
+    switch (aux_line_coding.bParityType) {
+        case 0:  config.parity = parity_none; break;
+        case 1:  config.parity = parity_odd; break;
+        case 2:  config.parity = parity_even; break;
+        default: config.parity = parity_none; break;
+    }
+    
+    config.fifo_enable = true;
+    config.rx_fifo_level = uart_rx_fifo_trg_not_empty;
+    config.tx_fifo_level = uart_tx_fifo_trg_not_full;
+    
+    (void)board_init_uart_clock(AUX_UART);
+    if (status_success != uart_init(AUX_UART, &config)) {
+        return;
+    }
+    
+    /* Enable RX interrupt */
+    uart_enable_irq(AUX_UART, uart_intr_rx_data_avail_or_timeout);
+    intc_m_enable_irq_with_priority(AUX_UART_IRQ, 2);
+    
+    uart_pins_configured = true;
+}
+
+/* Disable UART2 pins - called when switching to JTAG mode */
+void aux_serial_disable_pins(void)
+{
+    if (!uart_pins_configured)
+        return;
+    
+    /* Disable UART interrupt */
+    intc_m_disable_irq(AUX_UART_IRQ);
+    uart_disable_irq(AUX_UART, uart_intr_rx_data_avail_or_timeout);
+    
+    /* Call board-level pin uninit */
+    extern void uninit_uart2_pins(void);
+    uninit_uart2_pins();
+    
+    uart_pins_configured = false;
 }
 
 bool aux_serial_pins_enabled(void)
@@ -69,8 +121,32 @@ void aux_serial_set_encoding(const struct cdc_line_coding *coding)
     if (!coding)
         return;
     
-    /* STUB - Only save configuration, do not configure hardware */
+    /* Save configuration */
     memcpy(&aux_line_coding, coding, sizeof(struct cdc_line_coding));
+    
+    /* Reconfigure UART if already initialized */
+    if (!uart_pins_configured)
+        return;
+    
+    uart_config_t config = {0};
+    uart_default_config(AUX_UART, &config);
+    config.baudrate = coding->dwDTERate;
+    config.num_of_stop_bits = (coding->bCharFormat == 0) ? stop_bits_1 : stop_bits_2;
+    config.word_length = (coding->bDataBits == 8) ? word_length_8_bits : word_length_7_bits;
+    
+    switch (coding->bParityType) {
+        case 0:  config.parity = parity_none; break;
+        case 1:  config.parity = parity_odd; break;
+        case 2:  config.parity = parity_even; break;
+        default: config.parity = parity_none; break;
+    }
+    
+    config.fifo_enable = true;
+    config.rx_fifo_level = uart_rx_fifo_trg_not_empty;
+    config.tx_fifo_level = uart_tx_fifo_trg_not_full;
+    
+    uart_init(AUX_UART, &config);
+    uart_enable_irq(AUX_UART, uart_intr_rx_data_avail_or_timeout);
 }
 
 void aux_serial_get_encoding(struct cdc_line_coding *coding)

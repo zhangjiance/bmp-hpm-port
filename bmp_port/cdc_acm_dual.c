@@ -39,7 +39,7 @@
 /* RTT Endpoint (Interface 5) - Optional */
 #define RTT_IN_EP       0x85
 
-#define DFU_IF_NO  0x02  /* DFU interface number (was 0x04 with AUX CDC) */
+#define DFU_IF_NO  0x04  /* DFU interface number */
 #define WINUSB_VENDOR_CODE 0x20
 
 #define CDC_MAX_PACKET_SIZE 512
@@ -59,7 +59,7 @@
 #define UART_CDC_DESCRIPTOR_LEN CDC_ACM_DESCRIPTOR_LEN
 #define DFU_DESCRIPTOR_LEN (9 + 9)  /* Interface + Functional descriptor */
 #define DFU_MSOSV2_DESCRIPTOR_LEN (10 + USB_MSOSV2_COMP_ID_FUNCTION_WINUSB_MULTI_DESCRIPTOR_LEN)
-#define USB_CONFIG_SIZE (9 + GDB_CDC_DESCRIPTOR_LEN + DFU_DESCRIPTOR_LEN)  /* Removed UART_CDC to avoid JTAG conflict */
+#define USB_CONFIG_SIZE (9 + GDB_CDC_DESCRIPTOR_LEN + UART_CDC_DESCRIPTOR_LEN + DFU_DESCRIPTOR_LEN)
 
 static const uint8_t device_descriptor[] = {
     USB_DEVICE_DESCRIPTOR_INIT(USB_2_1, 0xEF, 0x02, 0x01, USBD_VID, USBD_PID, 0x0100, 0x01)
@@ -77,17 +77,18 @@ static const struct usb_msosv2_descriptor msosv2_descriptor = {
 };
 
 static const uint8_t config_descriptor_hs[] = {
-    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x05, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     
     /* GDB CDC Interface (0-1) */
-    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x04),
+    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x02),
     
-    /* AUX (UART/RTT) CDC removed to avoid JTAG pin conflict */
+    /* AUX (UART/RTT) CDC Interface (2-3) */
+    CDC_ACM_DESCRIPTOR_INIT(0x02, AUX_CDC_INT_EP, AUX_CDC_OUT_EP, AUX_CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x05),
     
     /* DFU Runtime Interface Descriptor */
     0x09,                          /* bLength */
     USB_DESCRIPTOR_TYPE_INTERFACE, /* bDescriptorType */
-    DFU_IF_NO,                     /* bInterfaceNumber = 2 */
+    DFU_IF_NO,                     /* bInterfaceNumber = 4 */
     0x00,                          /* bAlternateSetting */
     0x00,                          /* bNumEndpoints (Control endpoint only) */
     USB_DEVICE_CLASS_APP_SPECIFIC, /* bInterfaceClass = 0xFE */
@@ -105,17 +106,18 @@ static const uint8_t config_descriptor_hs[] = {
 };
 
 static const uint8_t config_descriptor_fs[] = {
-    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x05, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     
     /* GDB CDC Interface (0-1) */
-    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x04),
+    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x02),
     
-    /* AUX (UART/RTT) CDC removed to avoid JTAG pin conflict */
+    /* AUX (UART/RTT) CDC Interface (2-3) */
+    CDC_ACM_DESCRIPTOR_INIT(0x02, AUX_CDC_INT_EP, AUX_CDC_OUT_EP, AUX_CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x05),
     
     /* DFU Runtime Interface Descriptor */
     0x09,                          /* bLength */
     USB_DESCRIPTOR_TYPE_INTERFACE, /* bDescriptorType */
-    DFU_IF_NO,                     /* bInterfaceNumber = 2 */
+    DFU_IF_NO,                     /* bInterfaceNumber = 4 */
     0x00,                          /* bAlternateSetting */
     0x00,                          /* bNumEndpoints (Control endpoint only) */
     USB_DEVICE_CLASS_APP_SPECIFIC, /* bInterfaceClass = 0xFE */
@@ -137,9 +139,9 @@ static const uint8_t device_quality_descriptor[] = {
 };
 
 static const uint8_t other_speed_config_descriptor_hs[] = {
-    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
-    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x04),
-    /* AUX CDC removed to avoid JTAG conflict */
+    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x05, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x02),
+    CDC_ACM_DESCRIPTOR_INIT(0x02, AUX_CDC_INT_EP, AUX_CDC_OUT_EP, AUX_CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x05),
     
     /* DFU Runtime Interface */
     0x09, USB_DESCRIPTOR_TYPE_INTERFACE, DFU_IF_NO, 0x00, 0x00,
@@ -148,9 +150,9 @@ static const uint8_t other_speed_config_descriptor_hs[] = {
 };
 
 static const uint8_t other_speed_config_descriptor_fs[] = {
-    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
-    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x04),
-    /* AUX CDC removed to avoid JTAG conflict */
+    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x05, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    CDC_ACM_DESCRIPTOR_INIT(0x00, GDB_CDC_INT_EP, GDB_CDC_OUT_EP, GDB_CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x02),
+    CDC_ACM_DESCRIPTOR_INIT(0x02, AUX_CDC_INT_EP, AUX_CDC_OUT_EP, AUX_CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x05),
     
     /* DFU Runtime Interface */
     0x09, USB_DESCRIPTOR_TYPE_INTERFACE, DFU_IF_NO, 0x00, 0x00,
@@ -295,6 +297,9 @@ volatile uint32_t aux_usb_tx_count = 0;
 volatile uint32_t aux_usb_rx_count = 0;
 volatile uint32_t aux_usb_rx_offset = 0;
 
+/* Debug: count USB IN callbacks */
+volatile uint32_t aux_usb_in_callback_count = 0;
+
 /* UART RX circular buffer for interrupt-driven reception */
 #define AUX_UART_RX_BUFFER_SIZE 1024
 static uint8_t aux_uart_rx_buffer[AUX_UART_RX_BUFFER_SIZE];
@@ -303,6 +308,11 @@ static volatile uint16_t aux_uart_rx_read_idx = 0;
 
 /* External rtt_enabled flag from rtt.c */
 extern bool rtt_enabled;
+
+/* External RTT buffer functions from rtt_if.c */
+extern uint32_t rtt_get_available(void);
+extern uint32_t rtt_read_buffer(char *buf, uint32_t max_len);
+extern uint32_t rtt_write_buffer(const char *buf, uint32_t len);
 
 void usbd_cdc_acm_bulk_out_aux(uint8_t busid, uint8_t ep, uint32_t nbytes)
 {
@@ -323,9 +333,16 @@ void usbd_cdc_acm_bulk_out_aux(uint8_t busid, uint8_t ep, uint32_t nbytes)
 void usbd_cdc_acm_bulk_in_aux(uint8_t busid, uint8_t ep, uint32_t nbytes)
 {
     (void)busid;
+    
+    /* Count callbacks for debugging */
+    aux_usb_in_callback_count++;
+    
+    /* Check if we need to send a zero-length packet for alignment */
     if ((nbytes % usbd_get_ep_mps(busid, ep)) == 0 && nbytes) {
+        /* Send ZLP, keep busy flag set until ZLP completes */
         usbd_ep_start_write(busid, AUX_CDC_IN_EP, NULL, 0);
     } else {
+        /* No ZLP needed (or this IS the ZLP callback), clear busy flag */
         aux_usb_tx_busy_flag = false;
     }
 }
@@ -343,7 +360,20 @@ struct usbd_endpoint aux_cdc_in_ep = {
 /* UART2 Interrupt Handler for RX */
 void isr_uart2(void)
 {
-    /* STUB - UART hardware completely disabled, do nothing */
+    uint8_t status = uart_get_irq_id(AUX_UART);
+    if (status == uart_intr_id_rx_data_avail || status == uart_intr_id_rx_timeout) {
+        while (uart_check_status(AUX_UART, uart_stat_data_ready)) {
+            uint8_t ch;
+            uart_receive_byte(AUX_UART, &ch);
+            
+            /* Store in circular buffer */
+            uint16_t next_idx = (aux_uart_rx_write_idx + 1) % AUX_UART_RX_BUFFER_SIZE;
+            if (next_idx != aux_uart_rx_read_idx) {  /* Not full */
+                aux_uart_rx_buffer[aux_uart_rx_write_idx] = ch;
+                aux_uart_rx_write_idx = next_idx;
+            }
+        }
+    }
 }
 
 /* ===== USB Event Handler ===== */
@@ -377,9 +407,9 @@ static void usbd_event_handler(uint8_t busid, uint8_t event)
     case USBD_EVENT_SUSPEND:
         break;
     case USBD_EVENT_CONFIGURED:
-        /* Setup endpoint read transfers - GDB only, AUX removed to avoid JTAG conflict */
+        /* Setup endpoint read transfers */
         usbd_ep_start_read(busid, GDB_CDC_OUT_EP, gdb_usb_read_buffer, GDB_RX_BUFFER_SIZE);
-        // usbd_ep_start_read(busid, AUX_CDC_OUT_EP, aux_usb_read_buffer, AUX_RX_BUFFER_SIZE);
+        usbd_ep_start_read(busid, AUX_CDC_OUT_EP, aux_usb_read_buffer, AUX_RX_BUFFER_SIZE);
         break;
     case USBD_EVENT_SET_REMOTE_WAKEUP:
         break;
@@ -457,19 +487,19 @@ void cdc_acm_init(uint8_t busid, uint32_t reg_base)
     usbd_add_endpoint(busid, &gdb_cdc_out_ep);
     usbd_add_endpoint(busid, &gdb_cdc_in_ep);
     
-    /* AUX (UART/RTT) CDC interfaces removed to avoid JTAG pin conflict */
-    // usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf_aux_ctrl));
-    // usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf_aux_data));
-    // usbd_add_endpoint(busid, &aux_cdc_out_ep);
-    // usbd_add_endpoint(busid, &aux_cdc_in_ep);
+    /* Add AUX (UART/RTT) CDC interfaces (2-3) */
+    usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf_aux_ctrl));
+    usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf_aux_data));
+    usbd_add_endpoint(busid, &aux_cdc_out_ep);
+    usbd_add_endpoint(busid, &aux_cdc_in_ep);
     
-    /* Add DFU Runtime interface (2) */
+    /* Add DFU Runtime interface (4) */
     usbd_add_interface(busid, dfu_init_intf(&intf_dfu));
     
     usbd_initialize(busid, reg_base, usbd_event_handler);
     
-    /* Initialize UART2 hardware - DISABLED to avoid JTAG conflict */
-    // aux_serial_init();
+    /* DO NOT initialize UART hardware here - will be done on DTR activation */
+    /* aux_serial_init(); */
 }
 
 /* ===== DTR Control ===== */
@@ -481,8 +511,11 @@ void usbd_cdc_acm_set_dtr(uint8_t busid, uint8_t intf, bool dtr)
     (void)busid;
     if (intf == 0) {
         gdb_dtr_enable = dtr;
+    } else if (intf == 2) {
+        aux_dtr_enable = dtr;
+        /* Note: UART pins are controlled by debug interface mode (JTAG/SWD) now,
+         * not by DTR signal. See jtagtap_init() and swdptap_init() */
     }
-    /* Interface 2 is DFU (not CDC), do not process */
 }
 
 /* ===== Line Coding ===== */
@@ -505,8 +538,10 @@ void usbd_cdc_acm_set_line_coding(uint8_t busid, uint8_t intf, struct cdc_line_c
     (void)busid;
     if (intf == 0) {
         memcpy(&gdb_line_coding, line_coding, sizeof(struct cdc_line_coding));
+    } else if (intf == 2) {
+        memcpy(&aux_line_coding, line_coding, sizeof(struct cdc_line_coding));
+        aux_serial_set_encoding(line_coding);
     }
-    /* Interface 2 is DFU (not CDC), do not process */
 }
 
 void usbd_cdc_acm_get_line_coding(uint8_t busid, uint8_t intf, struct cdc_line_coding *line_coding)
@@ -514,8 +549,9 @@ void usbd_cdc_acm_get_line_coding(uint8_t busid, uint8_t intf, struct cdc_line_c
     (void)busid;
     if (intf == 0) {
         memcpy(line_coding, &gdb_line_coding, sizeof(struct cdc_line_coding));
+    } else if (intf == 2) {
+        memcpy(line_coding, &aux_line_coding, sizeof(struct cdc_line_coding));
     }
-    /* Interface 2 is DFU (not CDC), do not process */
 }
 
 /* ===== GDB Interface API ===== */
@@ -637,14 +673,81 @@ void aux_serial_stage_receive_buffer(void) {}
 /* UART polling task - called from main loop */
 void aux_serial_uart_poll(void)
 {
-    /* STUB - Discard all USB RX data, no UART transfer */
+#ifdef ENABLE_RTT
+    if (rtt_enabled) {
+        /* RTT Mode: Forward data between USB and RTT buffers */
+        
+        /* 1. Forward USB RX data to RTT down buffer (host→target) */
+        if (aux_usb_rx_count > 0) {
+            uint32_t written = rtt_write_buffer((const char *)aux_usb_read_buffer, aux_usb_rx_count);
+            (void)written; /* Ignore if buffer full, data will be dropped */
+            
+            /* Restart USB RX */
+            aux_usb_rx_count = 0;
+            aux_usb_rx_offset = 0;
+            usbd_ep_start_read(0, AUX_CDC_OUT_EP, aux_usb_read_buffer, AUX_RX_BUFFER_SIZE);
+        }
+        
+        /* 2. Send RTT up buffer data to USB (target→host) */
+        if (aux_usb_tx_busy_flag)
+            return;
+        
+        uint32_t available = rtt_get_available();
+        if (available > 0) {
+            uint32_t to_send = (available > AUX_RX_BUFFER_SIZE) ? AUX_RX_BUFFER_SIZE : available;
+            to_send = rtt_read_buffer((char *)aux_usb_write_buffer, to_send);
+            
+            if (to_send > 0) {
+                /* Debug: force send immediately */
+                l1c_dc_flush((uint32_t)aux_usb_write_buffer, USB_ALIGN_UP(to_send, 64));
+                aux_usb_tx_busy_flag = true;
+                usbd_ep_start_write(0, AUX_CDC_IN_EP, aux_usb_write_buffer, to_send);
+            }
+        }
+        
+        return;
+    }
+#endif
     
+    /* UART Mode: Forward data between USB and UART */
+    
+    /* Skip if UART not initialized yet */
+    extern bool aux_serial_pins_enabled(void);
+    if (!aux_serial_pins_enabled())
+        return;
+    
+    /* 1. Forward USB RX data to UART TX (USB→UART) */
     if (aux_usb_rx_count > 0) {
-        /* Discard received data and restart USB RX */
+        for (uint32_t i = 0; i < aux_usb_rx_count; i++) {
+            /* Non-blocking send - skip if FIFO full */
+            if (uart_check_status(AUX_UART, uart_stat_transmitter_empty)) {
+                uart_write_byte(AUX_UART, aux_usb_read_buffer[i]);
+            }
+        }
+        /* Mark data as consumed and restart USB RX */
         aux_usb_rx_count = 0;
         aux_usb_rx_offset = 0;
         usbd_ep_start_read(0, AUX_CDC_OUT_EP, aux_usb_read_buffer, AUX_RX_BUFFER_SIZE);
     }
     
-    /* No UART→USB transfer */
+    /* 2. Send UART RX data to USB (UART→USB) */
+    if (aux_usb_tx_busy_flag)
+        return;
+    
+    uint16_t available = 0;
+    if (aux_uart_rx_write_idx >= aux_uart_rx_read_idx)
+        available = aux_uart_rx_write_idx - aux_uart_rx_read_idx;
+    else
+        available = AUX_UART_RX_BUFFER_SIZE - aux_uart_rx_read_idx + aux_uart_rx_write_idx;
+    
+    if (available > 0) {
+        uint16_t to_send = (available > AUX_RX_BUFFER_SIZE) ? AUX_RX_BUFFER_SIZE : available;
+        
+        for (uint16_t i = 0; i < to_send; i++) {
+            aux_usb_write_buffer[i] = aux_uart_rx_buffer[aux_uart_rx_read_idx];
+            aux_uart_rx_read_idx = (aux_uart_rx_read_idx + 1) % AUX_UART_RX_BUFFER_SIZE;
+        }
+        
+        aux_serial_usb_send(to_send);
+    }
 }
