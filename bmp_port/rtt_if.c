@@ -37,6 +37,9 @@ int rtt_if_exit(void)
     return 0;
 }
 
+/* External USB busy flag from cdc_acm_dual.c */
+extern volatile bool aux_usb_tx_busy_flag;
+
 /* Write len bytes from target to host (USB) - Direct USB transmission */
 uint32_t rtt_write(const uint32_t channel, const char *buf, uint32_t len)
 {
@@ -45,8 +48,9 @@ uint32_t rtt_write(const uint32_t channel, const char *buf, uint32_t len)
         return 0;
     
     /* Check if USB is busy - if so, drop this packet */
-    /* Note: aux_serial_transmit_buffer_fullness() returns bytes pending */
-    if (aux_serial_transmit_buffer_fullness() > 0)
+    /* CRITICAL: Must check aux_usb_tx_busy_flag, not aux_serial_transmit_buffer_fullness() */
+    /* because aux_usb_tx_count is set to 0 when transmission starts */
+    if (aux_usb_tx_busy_flag)
         return 0;  /* USB busy, data will be dropped */
     
     /* Get USB transmit buffer */

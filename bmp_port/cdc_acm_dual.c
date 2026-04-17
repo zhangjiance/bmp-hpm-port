@@ -338,7 +338,7 @@ void usbd_cdc_acm_bulk_in_aux(uint8_t busid, uint8_t ep, uint32_t nbytes)
     /* Check if we need to send a zero-length packet for alignment */
     if ((nbytes % usbd_get_ep_mps(busid, ep)) == 0 && nbytes) {
         /* Send ZLP, keep busy flag set until ZLP completes */
-        usbd_ep_start_write(busid, AUX_CDC_IN_EP, NULL, 0);
+        usbd_ep_start_write(busid, ep, NULL, 0);
     } else {
         /* No ZLP needed (or this IS the ZLP callback), clear busy flag */
         aux_usb_tx_busy_flag = false;
