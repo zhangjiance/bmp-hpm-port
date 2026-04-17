@@ -75,7 +75,7 @@ static const uint8_t config_descriptor[] = {
     0x21,                          /* bDescriptorType (DFU Functional) */
     0x07,                          /* bmAttributes (bitCanDnload | bitWillDetach | bitManifestationTolerant) */
     0xFF, 0x00,                    /* wDetachTimeout = 255 ms */
-    0x00, 0x04,                    /* wTransferSize = 1024 bytes (Full Speed) */
+    0x00, 0x10,                    /* wTransferSize = 4096 bytes (USB-HS max) */
     0x1A, 0x01                     /* bcdDFUVersion = 1.1a (DfuSe) */
 };
 
@@ -304,8 +304,8 @@ int usbd_dfu_write(uint16_t block_num, const uint8_t *data, uint16_t length)
         return 0;
     }
 
-    /* Calculate target address */
-    uint32_t addr = (uint32_t)block_num * 1024U + dfu_download_address;
+    /* Calculate target address using configured transfer size */
+    uint32_t addr = (uint32_t)block_num * USBD_DFU_XFER_SIZE + dfu_download_address;
 
     dfu_path_accumulate(data, length);
     dfu_rx_blocks++;
