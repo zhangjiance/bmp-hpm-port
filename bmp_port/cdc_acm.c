@@ -17,6 +17,7 @@
 #define CDC_INT_EP 0x83
 
 #define DFU_IF_NO  0x02  /* DFU interface number */
+#define WINUSB_VENDOR_CODE 0x20
 
 #define CDC_MAX_PACKET_SIZE 512
 
@@ -32,10 +33,22 @@
 
 /*!< config descriptor size */
 #define DFU_DESCRIPTOR_LEN (9 + 9)  /* Interface + Functional descriptor */
+#define DFU_MSOSV2_DESCRIPTOR_LEN (10 + USB_MSOSV2_COMP_ID_FUNCTION_WINUSB_MULTI_DESCRIPTOR_LEN)
 #define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN + DFU_DESCRIPTOR_LEN)
 
 static const uint8_t device_descriptor[] = {
-    USB_DEVICE_DESCRIPTOR_INIT(USB_2_0, 0xEF, 0x02, 0x01, USBD_VID, USBD_PID, 0x0100, 0x01)
+    USB_DEVICE_DESCRIPTOR_INIT(USB_2_1, 0xEF, 0x02, 0x01, USBD_VID, USBD_PID, 0x0100, 0x01)
+};
+
+static const uint8_t dfu_winusb_msosv2_desc_set[] = {
+    USB_MSOSV2_COMP_ID_SET_HEADER_DESCRIPTOR_INIT(DFU_MSOSV2_DESCRIPTOR_LEN),
+    USB_MSOSV2_COMP_ID_FUNCTION_WINUSB_MULTI_DESCRIPTOR_INIT(DFU_IF_NO),
+};
+
+static const struct usb_msosv2_descriptor msosv2_descriptor = {
+    .vendor_code = WINUSB_VENDOR_CODE,
+    .compat_id = dfu_winusb_msosv2_desc_set,
+    .compat_id_len = sizeof(dfu_winusb_msosv2_desc_set),
 };
 
 static const uint8_t config_descriptor_hs[] = {
@@ -138,6 +151,29 @@ static const uint8_t other_speed_config_descriptor_fs[] = {
     0x1A, 0x01                     /* bcdDFUVersion = 1.1a (DfuSe) */
 };
 
+/* USB 2.0 Extension BOS Descriptor */
+static const uint8_t bos_descriptor_data[] = {
+    /* BOS Header */
+    0x05,                          /* bLength */
+    USB_DESCRIPTOR_TYPE_BINARY_OBJECT_STORE, /* bDescriptorType */
+    0x28, 0x00,                    /* wTotalLength: 40 bytes */
+    0x02,                          /* bNumDeviceCaps: 2 */
+    
+    /* USB 2.0 Extension Capability */
+    0x07,                          /* bLength */
+    0x10,                          /* bDescriptorType: DEVICE CAPABILITY */
+    0x02,                          /* bDevCapabilityType: USB 2.0 EXTENSION */
+    0x02, 0x00, 0x00, 0x00,        /* bmAttributes: LPM supported (bit 1) */
+
+    /* Microsoft OS 2.0 Platform Capability (WinUSB) */
+    USB_BOS_CAP_PLATFORM_WINUSB_DESCRIPTOR_INIT(WINUSB_VENDOR_CODE, sizeof(dfu_winusb_msosv2_desc_set))
+};
+
+static const struct usb_bos_descriptor bos_descriptor = {
+    .string = bos_descriptor_data,
+    .string_len = sizeof(bos_descriptor_data)
+};
+
 static const char *string_descriptors[] = {
     (const char[]){ 0x09, 0x04 }, /* Langid */
     "HPMicro",                    /* Manufacturer */
@@ -197,6 +233,8 @@ const struct usb_descriptor cdc_descriptor = {
     .config_descriptor_callback = config_descriptor_callback,
     .device_quality_descriptor_callback = device_quality_descriptor_callback,
     .other_speed_descriptor_callback = other_speed_config_descriptor_callback,
+    .msosv2_descriptor = &msosv2_descriptor,
+    .bos_descriptor = &bos_descriptor,
     .string_descriptor_callback = string_descriptor_callback,
 };
 
