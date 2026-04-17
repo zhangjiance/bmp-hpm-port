@@ -9,8 +9,6 @@
 
 /* External debug functions */
 extern uint32_t rtt_get_write_total(void);
-extern uint32_t rtt_get_read_total(void);
-extern uint32_t rtt_get_available(void);
 extern bool rtt_enabled;
 extern volatile bool aux_usb_tx_busy_flag;
 extern volatile bool aux_dtr_enable;
@@ -23,15 +21,10 @@ static bool cmd_rtt_debug(target_s *target, int argc, const char **argv)
     (void)argv;
     
     uint32_t write_total = rtt_get_write_total();
-    uint32_t read_total = rtt_get_read_total();
-    uint32_t available = rtt_get_available();
     
-    gdb_outf("=== RTT Buffer Debug ===\n");
+    gdb_outf("=== RTT Debug (Direct USB Mode) ===\n");
     gdb_outf("RTT Enabled: %s\n", rtt_enabled ? "YES" : "NO");
-    gdb_outf("Total written to buffer: %u bytes\n", write_total);
-    gdb_outf("Total read from buffer:  %u bytes\n", read_total);
-    gdb_outf("Currently available:     %u bytes\n", available);
-    gdb_outf("Lost data: %u bytes\n", write_total > read_total ? write_total - read_total : 0);
+    gdb_outf("Total sent to USB: %u bytes\n", write_total);
     gdb_outf("\n=== USB Status ===\n");
     gdb_outf("AUX USB TX Busy: %s\n", aux_usb_tx_busy_flag ? "YES (BLOCKED!)" : "NO");
     gdb_outf("AUX DTR Enabled: %s\n", aux_dtr_enable ? "YES" : "NO");

@@ -66,8 +66,6 @@ static void bmp_poll_loop(void)
 		if (rtt_enabled)
 			poll_rtt(cur_target);
 #endif
-		/* Poll UART/RTT to transfer data to USB while target is running */
-		aux_serial_uart_poll();
 	}
 
 	SET_IDLE_STATE(true);

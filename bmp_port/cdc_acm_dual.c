@@ -309,9 +309,7 @@ static volatile uint16_t aux_uart_rx_read_idx = 0;
 /* External rtt_enabled flag from rtt.c */
 extern bool rtt_enabled;
 
-/* External RTT buffer functions from rtt_if.c */
-extern uint32_t rtt_get_available(void);
-extern uint32_t rtt_read_buffer(char *buf, uint32_t max_len);
+/* External RTT buffer function from rtt_if.c */
 extern uint32_t rtt_write_buffer(const char *buf, uint32_t len);
 
 void usbd_cdc_acm_bulk_out_aux(uint8_t busid, uint8_t ep, uint32_t nbytes)
@@ -675,9 +673,9 @@ void aux_serial_uart_poll(void)
 {
 #ifdef ENABLE_RTT
     if (rtt_enabled) {
-        /* RTT Mode: Forward data between USB and RTT buffers */
+        /* RTT Mode: Forward USB RX data to RTT down buffer (host→target) */
+        /* Note: RTT TX (target→host) is handled directly in rtt_write() */
         
-        /* 1. Forward USB RX data to RTT down buffer (host→target) */
         if (aux_usb_rx_count > 0) {
             uint32_t written = rtt_write_buffer((const char *)aux_usb_read_buffer, aux_usb_rx_count);
             (void)written; /* Ignore if buffer full, data will be dropped */
@@ -686,23 +684,6 @@ void aux_serial_uart_poll(void)
             aux_usb_rx_count = 0;
             aux_usb_rx_offset = 0;
             usbd_ep_start_read(0, AUX_CDC_OUT_EP, aux_usb_read_buffer, AUX_RX_BUFFER_SIZE);
-        }
-        
-        /* 2. Send RTT up buffer data to USB (target→host) */
-        if (aux_usb_tx_busy_flag)
-            return;
-        
-        uint32_t available = rtt_get_available();
-        if (available > 0) {
-            uint32_t to_send = (available > AUX_RX_BUFFER_SIZE) ? AUX_RX_BUFFER_SIZE : available;
-            to_send = rtt_read_buffer((char *)aux_usb_write_buffer, to_send);
-            
-            if (to_send > 0) {
-                /* Debug: force send immediately */
-                l1c_dc_flush((uint32_t)aux_usb_write_buffer, USB_ALIGN_UP(to_send, 64));
-                aux_usb_tx_busy_flag = true;
-                usbd_ep_start_write(0, AUX_CDC_IN_EP, aux_usb_write_buffer, to_send);
-            }
         }
         
         return;
