@@ -51,7 +51,6 @@ int main(void)
     BOOT_PRINTF("========================================\r\n\r\n");
     
     static bool upgrade_done_triggered = false;
-    uint32_t heartbeat_ms = 0;
     
     /* Main bootloader loop */
     while (1)
@@ -75,12 +74,6 @@ int main(void)
             boot_port_board_deinit();
             boot_port_jump_to_app();
             /* Never returns */
-        }
-
-        heartbeat_ms++;
-        if (heartbeat_ms >= 1000U) {
-            heartbeat_ms = 0;
-            BOOT_PRINTF("[BOOT] heartbeat: waiting for DFU/MSC\r\n");
         }
         
         board_delay_ms(1);
