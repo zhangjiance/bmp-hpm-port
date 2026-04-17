@@ -40,9 +40,10 @@
 
 
 #include "rtt.h"
+#include "aux_serial.h"
 
 
-/***************************************Variables***********************************/
+/***************************************Variables************************************/
 
 /***************************************Functions***********************************/
 
@@ -84,6 +85,9 @@ int main(void) {
   board_timer_create(50, board_timer_process);
 
   while (true) {
+    /* Poll UART RX and transfer to USB (only in UART mode) - DISABLED */
+    // aux_serial_uart_poll();
+    
     TRY(EXCEPTION_ALL) { bmp_poll_loop(); }
     CATCH() {
     default:

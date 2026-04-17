@@ -52,12 +52,7 @@
 #include "rtt.h"
 #include "rtt_if.h"
 
-
-
-bool gdb_serial_get_dtr(void)
-{
-	return true;
-}
+/* gdb_serial_get_dtr is implemented in cdc_acm_dual.c */
 
 
 // void usb_serial_set_state(usbd_device *const dev, const uint16_t iface, const uint8_t ep)

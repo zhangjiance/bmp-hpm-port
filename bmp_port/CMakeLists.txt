@@ -2,7 +2,13 @@
 sdk_inc(.)
 sdk_inc($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu)  # Add DFU header path
 sdk_src(platform.c)
-sdk_src(cdc_acm.c)
+
+# USB CDC implementation - choose one:
+# sdk_src(cdc_acm.c)           # Single CDC (GDB only)
+sdk_src(cdc_acm_dual.c)      # Dual CDC (GDB + UART) + RTT
+sdk_src(aux_serial.c)         # UART serial pass-through
+sdk_src(rtt_if.c)             # RTT transfer support
+
 # sdk_src(gdb_if.c)
 sdk_src(swdptap.c)
 sdk_src(jtagtap.c)
