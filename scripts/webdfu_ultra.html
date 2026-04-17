@@ -110,10 +110,19 @@
 </head>
 <body>
     <div>
-        <h2>⚡ WebUSB DFU</h2>
-        <p><small>Chrome 61+ | 1.Connect 2.Select .bin 3.Download</small></p>
+        <h2>⚡ WebUSB DFU-Se</h2>
+        <p><small>HPMicro Bootloader | 1.Connect 2.Select firmware 3.Download</small></p>
         <button id="c">🔌 Connect to Device</button>
-        <input type="file" id="f" accept=".bin,.dfu">
+        <div style="display:flex;gap:16px;margin:16px 0">
+            <div style="flex:1">
+                <label style="display:block;margin-bottom:8px;font-size:14px;color:#555">📍 Target Address</label>
+                <input type="text" id="a" placeholder="0x80020000" value="0x80020000" style="margin:0">
+            </div>
+            <div style="flex:2">
+                <label style="display:block;margin-bottom:8px;font-size:14px;color:#555">📦 Firmware File</label>
+                <input type="file" id="f" accept=".bin,.dfu" style="margin:0">
+            </div>
+        </div>
         <button id="d" disabled>⬇️ Download Firmware</button>
         <div id="p"><div id="b">0%</div></div>
         <div id="l"></div>
@@ -164,7 +173,8 @@
                                     configuration: conf,
                                     interface: intf,
                                     alternate: alt,
-                                    name: alt.interfaceName
+                                    name: alt.interfaceName,
+                                    protocol: alt.interfaceProtocol
                                 });
                             }
                         }
@@ -247,6 +257,10 @@
                 return this.requestOut(dfu.DNLOAD, data, blockNum);
             };
             
+            dfu.Device.prototype.detach = function() {
+                return this.requestOut(dfu.DETACH);
+            };
+            
             dfu.Device.prototype.clearStatus = function() {
                 return this.requestOut(dfu.CLRSTATUS);
             };
@@ -306,17 +320,53 @@
                 return this.poll_until(state => state == idle_state);
             };
             
-            dfu.Device.prototype.do_download = async function(xfer_size, data, manifestationTolerant) {
+            dfu.Device.prototype.do_download = async function(xfer_size, data, manifestationTolerant, targetAddress) {
                 let bytes_sent = 0;
                 let expected_size = data.byteLength;
-                /*
-                 * CherryUSB DFU implementation treats block 0/1 as command space.
-                 * Firmware payload must start from block #2.
-                 */
-                let transaction = 2;
+                let transaction = 0;
                 
-                this.logInfo("Downloading firmware");
+                this.logInfo("Downloading firmware using DFU-Se protocol");
                 this.logProgress(0, expected_size);
+                
+                if (targetAddress !== undefined && targetAddress !== null) {
+                    this.logInfo("Sending ERASE command for address 0x" + targetAddress.toString(16).toUpperCase());
+                    let eraseCmd = new ArrayBuffer(5);
+                    let eraseCmdView = new DataView(eraseCmd);
+                    eraseCmdView.setUint8(0, 0x41);
+                    eraseCmdView.setUint32(1, targetAddress, true);
+                    
+                    try {
+                        await this.download(eraseCmd, transaction++);
+                        this.logInfo("Waiting for erase to complete...");
+                        let status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
+                        if (status.status != dfu.STATUS_OK) {
+                            throw `DFU ERASE failed state=${status.state}, status=${status.status}`;
+                        }
+                        this.logInfo("✅ Erase completed");
+                    } catch (error) {
+                        throw "Error during DFU erase: " + error;
+                    }
+                }
+                
+                if (targetAddress !== undefined && targetAddress !== null) {
+                    this.logInfo("Setting download address to 0x" + targetAddress.toString(16).toUpperCase());
+                    let addrCmd = new ArrayBuffer(5);
+                    let addrCmdView = new DataView(addrCmd);
+                    addrCmdView.setUint8(0, 0x21);
+                    addrCmdView.setUint32(1, targetAddress, true);
+                    
+                    try {
+                        await this.download(addrCmd, transaction++);
+                        let status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
+                        if (status.status != dfu.STATUS_OK) {
+                            throw `DFU SET_ADDRESS failed state=${status.state}, status=${status.status}`;
+                        }
+                    } catch (error) {
+                        throw "Error during DFU set address: " + error;
+                    }
+                }
+                
+                transaction = 2;
                 
                 while (bytes_sent < expected_size) {
                     const bytes_to_send = Math.min(expected_size - bytes_sent, xfer_size);
@@ -383,11 +433,12 @@
         }();
         
         var dev = null, fw = null;
-        const DFU_VID = 0xFFFF;
-        const DFU_PID = 0xFFFF;
+        const DFU_VID = 0x34BF;
+        const DFU_PID = 0x0003;
         const cb = document.getElementById('c');
         const db = document.getElementById('d');
         const fi = document.getElementById('f');
+        const ai = document.getElementById('a');
         const pc = document.getElementById('p');
         const pb = document.getElementById('b');
         const lg = document.getElementById('l');
@@ -401,43 +452,42 @@
             lg.style.display = 'block';
         }
         
+        async function connectDevice() {
+            log('🔍 Requesting HPMicro DFU device...');
+            
+            let device;
+            try {
+                device = await navigator.usb.requestDevice({
+                    filters: [{ vendorId: DFU_VID, productId: DFU_PID }]
+                });
+            } catch (error) {
+                if (error && error.name === 'NotFoundError') {
+                    log('⚠️ HPMicro device not found, showing all DFU devices...');
+                    device = await navigator.usb.requestDevice({ filters: [] });
+                } else {
+                    throw error;
+                }
+            }
+            
+            const interfaces = dfu.findDeviceDfuInterfaces(device);
+            if (interfaces.length === 0) {
+                throw new Error('No DFU interface found');
+            }
+            
+            dev = new dfu.Device(device, interfaces[0]);
+            await dev.open();
+            
+            const vid_str = '0x' + device.vendorId.toString(16).padStart(4, '0').toUpperCase();
+            const pid_str = '0x' + device.productId.toString(16).padStart(4, '0').toUpperCase();
+            log('✅ Connected: VID=' + vid_str + ' PID=' + pid_str);
+            log('🔖 ' + interfaces[0].name);
+            
+            return device;
+        }
+        
         cb.addEventListener('click', async () => {
             try {
-                let device = null;
-                log('🔍 Requesting preferred device list (VID=0xFFFF, PID=0xFFFF)...');
-                try {
-                    device = await navigator.usb.requestDevice({
-                        filters: [{ vendorId: DFU_VID, productId: DFU_PID }]
-                    });
-                } catch (error) {
-                    if (error && error.name === 'NotFoundError') {
-                        log('⚠️ Preferred VID/PID not selected, falling back to full device list...');
-                        device = await navigator.usb.requestDevice({ filters: [] });
-                    } else {
-                        throw error;
-                    }
-                }
-
-                if (device.vendorId === DFU_VID && device.productId === DFU_PID) {
-                    log('✅ Selected preferred VID/PID device');
-                } else {
-                    const vid = '0x' + device.vendorId.toString(16).padStart(4, '0').toUpperCase();
-                    const pid = '0x' + device.productId.toString(16).padStart(4, '0').toUpperCase();
-                    log('ℹ️ Selected fallback device: VID=' + vid + ', PID=' + pid);
-                }
-
-                const interfaces = dfu.findDeviceDfuInterfaces(device);
-                
-                if (interfaces.length === 0) {
-                    throw new Error('No DFU interface found. Set BOOT0=HIGH and reconnect!');
-                }
-                
-                console.log('Found DFU interfaces:', interfaces);
-                dev = new dfu.Device(device, interfaces[0]);
-                await dev.open();
-                
-                log('✅ Connected: ' + (device.productName || 'DFU Device'));
-                log('📍 Interface #' + interfaces[0].interface.interfaceNumber + ': ' + (interfaces[0].name || 'DFU'));
+                await connectDevice();
                 
                 cb.textContent = '✅ Connected';
                 cb.disabled = true;
@@ -469,11 +519,25 @@
                 return void log('❌ Device not connected properly. Please reconnect.', true);
             }
             
+            let targetAddress = 0x80020000;
+            const addrStr = ai.value.trim();
+            if (addrStr) {
+                try {
+                    targetAddress = parseInt(addrStr, addrStr.startsWith('0x') ? 16 : 10);
+                    if (isNaN(targetAddress) || targetAddress < 0) {
+                        throw new Error('Invalid address');
+                    }
+                } catch (error) {
+                    return void log('❌ Invalid target address: ' + addrStr, true);
+                }
+            }
+            
             try {
                 db.disabled = true;
                 pc.style.display = 'block';
                 pb.textContent = 'Preparing...';
                 log('⚡ Starting firmware download...');
+                log('📍 Target: 0x' + targetAddress.toString(16).toUpperCase());
                 log('🔄 Preparing device...');
                 
                 try {
@@ -495,7 +559,22 @@
                     }
                 };
                 
-                await dev.do_download(512, fw, false);
+                const properties = await dev.device_.controlTransferIn({
+                    requestType: 'standard',
+                    recipient: 'interface',
+                    request: 0x06,
+                    value: 0x2100,
+                    index: dev.intfNumber
+                }, 256);
+                
+                let transferSize = 2048;
+                if (properties.status === 'ok' && properties.data.byteLength >= 9) {
+                    const desc = new DataView(properties.data.buffer);
+                    transferSize = desc.getUint16(5, true);
+                    log('📦 Transfer size: ' + transferSize + ' bytes');
+                }
+                
+                await dev.do_download(transferSize, fw, false, targetAddress);
                 
                 log('✅ Firmware downloaded successfully!');
                 log('🔄 Device is resetting...');
@@ -519,9 +598,10 @@
         });
         
         if (navigator.usb) {
-            log('✅ WebUSB ready (Chrome 61+)');
-            log('🎯 Device filter: VID=0xFFFF PID=0xFFFF');
-            log('ℹ️ Set BOOT0=HIGH, connect device');
+            log('✅ WebUSB ready');
+            log('🎯 HPMicro DFU Bootloader (VID=0x34BF PID=0x0003)');
+            log('📋 Protocol: DFU-Se 1.1a');
+            log('ℹ️ Click "Connect" to start');
         } else {
             log('❌ WebUSB not supported', true);
             cb.disabled = true;

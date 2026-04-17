@@ -69,3 +69,13 @@ sdk_compile_definitions(-DCONFIG_USB_PRINTF=printf)
 sdk_compile_definitions(-DCONFIG_USB_DBG_LEVEL=2)
 sdk_compile_definitions(-DCONFIG_NDEBUG_CONSOLE=1)
 sdk_compile_definitions(-DGDB_PACKET_BUFFER_SIZE=16384)
+
+# Disable BOOT_PRINTF and printf in Release builds
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    sdk_compile_definitions(-DNDEBUG)
+    message(STATUS "Release build: BOOT_PRINTF disabled")
+endif()
+
+# Generate IDE projects and ensure HTML header is generated before compilation
+generate_ide_projects()
+add_dependencies(app generate_webdfu_header)
