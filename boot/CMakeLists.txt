@@ -59,10 +59,12 @@ sdk_app_src(port/hpm/boot_port_board_hpm.c)
 sdk_app_src($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu/usbd_dfu.c)
 
 # Compile definitions
-sdk_compile_definitions(-DCONFIG_USB_HS=0)
+sdk_compile_definitions(-DCONFIG_USB_HS=0)  # Use Full Speed for DFU stability
 sdk_compile_definitions(-DBOARD_UF2_SIGNATURE=0x0A4D5048)
-sdk_compile_definitions(-DUSBD_DFU_XFER_SIZE=512)
+sdk_compile_definitions(-DUSBD_DFU_XFER_SIZE=1024)  # 1KB for Full Speed
 sdk_compile_definitions(-DUSBD_DFU_APP_DEFAULT_ADD=0x80020000)
+sdk_compile_definitions(-DFLASH_ERASE_TIME=15000)  # 15 seconds for full 896KB erase
+sdk_compile_definitions(-DFLASH_PROGRAM_TIME=30)  # 30ms per 1KB write
 sdk_compile_definitions(-DCONFIG_USB_PRINTF=printf)
 sdk_compile_definitions(-DCONFIG_USB_DBG_LEVEL=2)
 sdk_compile_definitions(-DCONFIG_NDEBUG_CONSOLE=1)

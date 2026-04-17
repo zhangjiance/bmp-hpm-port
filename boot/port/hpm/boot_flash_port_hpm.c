@@ -89,8 +89,12 @@ int boot_flash_port_write(uint32_t address, const uint8_t *data, size_t size)
     /*
      * Some DFU paths can pass buffers/sizes that are not 4-byte aligned.
      * Stage data into a local aligned buffer and pad tail with 0xFF.
+     * 
+     * IMPORTANT: Use smaller chunks (16 bytes) to minimize interrupt latency.
+     * USB requires timely interrupt handling - long IRQ-disabled sections
+     * cause LIBUSB_ERROR_TIMEOUT during DFU downloads.
      */
-    uint32_t staging[64]; /* 256-byte chunk, 4-byte aligned */
+    uint32_t staging[4]; /* 16-byte chunk, 4-byte aligned */
     uint32_t curr_addr = address;
     size_t remaining = size;
     const uint8_t *src = data;
@@ -224,15 +228,28 @@ bool boot_flash_port_check_app_valid(void)
     /* Force fence to ensure flash reads are not cached */
     fencei();
     
-    const uint32_t signature = *(const uint32_t *)BOOT_FLASH_APP_START;
-    const uint32_t expected = BOARD_UF2_SIGNATURE;
+    const uint32_t *app_start = (const uint32_t *)BOOT_FLASH_APP_START;
+    const uint32_t signature = app_start[0];
+    const uint32_t first_code = app_start[1];
     
-    BOOT_PRINTF("[BOOT] Checking app signature at 0x%08lx\r\n", BOOT_FLASH_APP_START);
-    BOOT_PRINTF("[BOOT]   Read:     0x%08lx\r\n", signature);
-    BOOT_PRINTF("[BOOT]   Expected: 0x%08lx\r\n", expected);
-    BOOT_PRINTF("[BOOT]   Valid:    %s\r\n", (signature == expected) ? "YES" : "NO");
+    BOOT_PRINTF("[BOOT] Checking app at 0x%08lx\r\n", BOOT_FLASH_APP_START);
+    BOOT_PRINTF("[BOOT]   Signature: 0x%08lx (expect 0x%08lx)\r\n", signature, (unsigned long)BOARD_UF2_SIGNATURE);
+    BOOT_PRINTF("[BOOT]   First code: 0x%08lx\r\n", first_code);
     
-    return signature == BOARD_UF2_SIGNATURE;
+    /* Check 1: Must have UF2 signature at offset 0 */
+    if (signature != BOARD_UF2_SIGNATURE) {
+        BOOT_PRINTF("[BOOT]   Result: INVALID (wrong signature)\r\n");
+        return false;
+    }
+    
+    /* Check 2: Code at offset +4 must not be erased */
+    if (first_code == 0xFFFFFFFF) {
+        BOOT_PRINTF("[BOOT]   Result: INVALID (no app code)\r\n");
+        return false;
+    }
+    
+    BOOT_PRINTF("[BOOT]   Result: VALID\r\n");
+    return true;
 }
 
 void boot_flash_port_accumulate_checksum(uint32_t addr, size_t len)

@@ -75,8 +75,8 @@ static const uint8_t config_descriptor[] = {
     0x21,                          /* bDescriptorType (DFU Functional) */
     0x07,                          /* bmAttributes (bitCanDnload | bitWillDetach | bitManifestationTolerant) */
     0xFF, 0x00,                    /* wDetachTimeout = 255 ms */
-    0x00, 0x02,                    /* wTransferSize = 512 bytes */
-    0x10, 0x01                     /* bcdDFUVersion = 1.1 */
+    0x00, 0x04,                    /* wTransferSize = 1024 bytes (Full Speed) */
+    0x1A, 0x01                     /* bcdDFUVersion = 1.1a (DfuSe) */
 };
 
 static const uint8_t device_quality_descriptor[] = {
@@ -116,11 +116,11 @@ static const struct usb_bos_descriptor bos_descriptor = {
 };
 
 static const char *string_descriptors[] = {
-    (const char[]){ 0x09, 0x04 },  /* Langid */
-    "HPMicro",                      /* Manufacturer */
-    "HPM UF2+DFU Bootloader",       /* Product */
-    "2024041500",                   /* Serial Number */
-    "HPM DFU Device",               /* DFU Interface */
+    (const char[]){ 0x09, 0x04 },                                       /* Langid */
+    "HPMicro",                                                          /* Manufacturer */
+    "HPM UF2+DFU Bootloader",                                           /* Product */
+    "2024041500",                                                       /* Serial Number */
+    "@Internal Flash/0x80020000/224*004Kg",  /* DFU Interface - DfuSe memory layout */
 };
 
 static const uint8_t *device_descriptor_callback(uint8_t speed)
@@ -214,6 +214,19 @@ int usbd_msc_sector_write(uint8_t busid, uint8_t lun, uint32_t sector, uint8_t *
 static struct usbd_interface intf0;
 static struct usbd_interface intf1;
 
+/* DFU state tracking variables */
+static uint32_t dfu_download_address;
+static volatile bool dfu_erased = false;
+static volatile bool dfu_reset_pending = false;
+static uint32_t dfu_rx_blocks = 0;
+static uint32_t dfu_rx_bytes = 0;
+static uint32_t dfu_rx_checksum = 0;
+
+/* Incremental erase state */
+static volatile bool dfu_erase_in_progress = false;
+static uint32_t dfu_erase_next_addr = 0;
+static uint32_t dfu_erase_end_addr = 0;
+
 bool boot_upgrade_request_active(void)
 {
     return upgrade_request_active;
@@ -232,19 +245,19 @@ void boot_upgrade_request_set(void)
 void msc_bootuf2_init(uint8_t busid, uintptr_t reg_base)
 {
     upgrade_request_active = false;
+    dfu_erased = false;  /* Reset erase flag on init */
+    dfu_erase_in_progress = false;
+    dfu_erase_next_addr = 0;
+    dfu_erase_end_addr = 0;
+    dfu_rx_blocks = 0;
+    dfu_rx_bytes = 0;
+    dfu_rx_checksum = 0;
+    
     usbd_desc_register(busid, &msc_bootuf2_descriptor);
     usbd_add_interface(busid, usbd_msc_init_intf(busid, &intf0, MSC_OUT_EP, MSC_IN_EP));
     usbd_add_interface(busid, usbd_dfu_init_intf(&intf1));
     usbd_initialize(busid, reg_base, usbd_event_handler);
 }
-
-static uint32_t dfu_download_address;
-static volatile bool dfu_erased = false;
-static volatile bool dfu_reset_pending = false;
-static volatile bool dfu_first_write_logged = false;
-static uint32_t dfu_rx_blocks = 0;
-static uint32_t dfu_rx_bytes = 0;
-static uint32_t dfu_rx_checksum = 0;
 
 static void dfu_path_accumulate(const uint8_t *data, uint32_t len)
 {
@@ -258,12 +271,11 @@ void usbd_dfu_begin_load(void)
     USB_LOG_INFO("DFU download begin\r\n");
     upgrade_request_active = true;
     dfu_download_address = boot_flash_port_get_app_start();
-    dfu_erased = false;
-    dfu_first_write_logged = false;
     dfu_rx_blocks = 0;
     dfu_rx_bytes = 0;
     dfu_rx_checksum = 0;
     BOOT_PRINTF("[DFU-PATH] begin, app_start=0x%08lx\r\n", (unsigned long)dfu_download_address);
+    /* Note: Erase will be done in dfu_erase_flash() when ERASE command is received */
 }
 
 void usbd_dfu_end_load(void)
@@ -292,20 +304,13 @@ int usbd_dfu_write(uint16_t block_num, const uint8_t *data, uint16_t length)
         return 0;
     }
 
-    if (!dfu_erased) {
-        int erase_ret = boot_flash_port_erase_app();
-        if (erase_ret != 0) {
-            USB_LOG_ERR("[DFU] Erase app failed: %d\r\n", erase_ret);
-            return erase_ret;
-        }
-        dfu_erased = true;
-    }
+    /* Calculate target address */
+    uint32_t addr = (uint32_t)block_num * 1024U + dfu_download_address;
 
-    uint32_t addr = (uint32_t)block_num * 512U + dfu_download_address;
     dfu_path_accumulate(data, length);
     dfu_rx_blocks++;
     dfu_rx_bytes += length;
-    if (dfu_rx_blocks <= 3U || (dfu_rx_blocks % 32U) == 0U) {
+    if (dfu_rx_blocks <= 3U || (dfu_rx_blocks % 128U) == 0U) {
         uint32_t w0 = 0;
         if (length >= 4U) {
             memcpy(&w0, data, sizeof(w0));
@@ -359,42 +364,23 @@ uint8_t *dfu_read_flash(uint8_t *src, uint8_t *dest, uint32_t len)
 
 uint16_t dfu_write_flash(uint8_t *src, uint8_t *dest, uint32_t len)
 {
-    if (!dfu_erased) {
-        int erase_ret = boot_flash_port_erase_app();
-        if (erase_ret != 0) {
-            USB_LOG_ERR("[DFU] Erase app failed before write: %d\r\n", erase_ret);
-            return 0;
+    /* Log first write and periodic updates */
+    if (dfu_rx_blocks == 0) {
+        uint32_t w0 = 0;
+        if (len >= 4) {
+            memcpy(&w0, src, sizeof(w0));
         }
-        dfu_erased = true;
+        BOOT_PRINTF("[DFU] First write: dest=0x%08lx len=%lu w0=0x%08lx\r\n",
+                    (unsigned long)dest,
+                    (unsigned long)len,
+                    (unsigned long)w0);
     }
 
     dfu_path_accumulate(src, len);
     dfu_rx_blocks++;
     dfu_rx_bytes += len;
 
-    if (!dfu_first_write_logged) {
-        uint32_t w0 = 0;
-        uint32_t w1 = 0;
-        if (len >= 4) {
-            memcpy(&w0, src, sizeof(w0));
-        }
-        if (len >= 8) {
-            memcpy(&w1, src + 4, sizeof(w1));
-        }
-        USB_LOG_INFO("[DFU] First write addr=0x%08lx len=%lu w0=0x%08lx w1=0x%08lx\r\n",
-                     (uint32_t)dest,
-                     (unsigned long)len,
-                     (unsigned long)w0,
-                     (unsigned long)w1);
-        BOOT_PRINTF("[DFU-PATH] first dfu_write_flash addr=0x%08lx len=%lu w0=0x%08lx w1=0x%08lx\r\n",
-                    (unsigned long)dest,
-                    (unsigned long)len,
-                    (unsigned long)w0,
-                    (unsigned long)w1);
-        dfu_first_write_logged = true;
-    }
-
-    if ((dfu_rx_blocks % 32U) == 0U) {
+    if ((dfu_rx_blocks % 128U) == 0U) {
         uint32_t w0 = 0;
         if (len >= 4U) {
             memcpy(&w0, src, sizeof(w0));
@@ -424,13 +410,23 @@ uint16_t dfu_erase_flash(uint32_t addr)
         return 0;
     }
 
-    int erase_ret = boot_flash_port_erase_sector(addr);
-    if (erase_ret != 0) {
-        USB_LOG_ERR("[DFU] Erase sector failed at 0x%08lx, err=%d\r\n", addr, erase_ret);
-        return 0;
+    /* First erase command: erase entire application region to avoid timeout during write.
+     * This takes time but DFU-Se expects it and will wait.
+     */
+    if (!dfu_erased) {
+        BOOT_PRINTF("[DFU] Erasing full application region (896KB)...\r\n");
+        USB_LOG_INFO("[DFU] Full erase at 0x%08lx\r\n", addr);
+        
+        int erase_ret = boot_flash_port_erase_app();
+        if (erase_ret != 0) {
+            USB_LOG_ERR("[DFU] Full erase failed: %d\r\n", erase_ret);
+            return 0;
+        }
+        
+        dfu_erased = true;
+        BOOT_PRINTF("[DFU] Full erase completed\r\n");
     }
 
-    dfu_erased = true;
     return 1;
 }
 

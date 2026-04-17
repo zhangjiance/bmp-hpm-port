@@ -7,6 +7,7 @@
 
 #include "usbd_core.h"
 #include "usbd_cdc_acm.h"
+#include "usb_dfu.h"
 #include "general.h"
 #include "gdb_if.h"
 #include "hpm_l1c_drv.h"
@@ -14,6 +15,8 @@
 #define CDC_IN_EP  0x81
 #define CDC_OUT_EP 0x01
 #define CDC_INT_EP 0x83
+
+#define DFU_IF_NO  0x02  /* DFU interface number */
 
 #define CDC_MAX_PACKET_SIZE 512
 
@@ -28,20 +31,59 @@
 #endif
 
 /*!< config descriptor size */
-#define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN)
+#define DFU_DESCRIPTOR_LEN (9 + 9)  /* Interface + Functional descriptor */
+#define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN + DFU_DESCRIPTOR_LEN)
 
 static const uint8_t device_descriptor[] = {
     USB_DEVICE_DESCRIPTOR_INIT(USB_2_0, 0xEF, 0x02, 0x01, USBD_VID, USBD_PID, 0x0100, 0x01)
 };
 
 static const uint8_t config_descriptor_hs[] = {
-    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x02, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     CDC_ACM_DESCRIPTOR_INIT(0x00, CDC_INT_EP, CDC_OUT_EP, CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x02),
+    
+    /* DFU Runtime Interface Descriptor */
+    0x09,                          /* bLength */
+    USB_DESCRIPTOR_TYPE_INTERFACE, /* bDescriptorType */
+    DFU_IF_NO,                     /* bInterfaceNumber = 2 */
+    0x00,                          /* bAlternateSetting */
+    0x00,                          /* bNumEndpoints (Control endpoint only) */
+    USB_DEVICE_CLASS_APP_SPECIFIC, /* bInterfaceClass = 0xFE */
+    0x01,                          /* bInterfaceSubClass (DFU) */
+    0x01,                          /* bInterfaceProtocol (Runtime) */
+    0x04,                          /* iInterface (String Index 4) */
+    
+    /* DFU Functional Descriptor */
+    0x09,                          /* bLength */
+    0x21,                          /* bDescriptorType (DFU Functional) */
+    0x0B,                          /* bmAttributes (bitCanDnload | bitCanUpload | bitManifestationTolerant | bitWillDetach) */
+    0xFF, 0x00,                    /* wDetachTimeout = 255 ms */
+    0x00, 0x04,                    /* wTransferSize = 1024 bytes */
+    0x1A, 0x01                     /* bcdDFUVersion = 1.1a (DfuSe) */
 };
 
 static const uint8_t config_descriptor_fs[] = {
-    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x02, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     CDC_ACM_DESCRIPTOR_INIT(0x00, CDC_INT_EP, CDC_OUT_EP, CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x02),
+    
+    /* DFU Runtime Interface Descriptor */
+    0x09,                          /* bLength */
+    USB_DESCRIPTOR_TYPE_INTERFACE, /* bDescriptorType */
+    DFU_IF_NO,                     /* bInterfaceNumber = 2 */
+    0x00,                          /* bAlternateSetting */
+    0x00,                          /* bNumEndpoints (Control endpoint only) */
+    USB_DEVICE_CLASS_APP_SPECIFIC, /* bInterfaceClass = 0xFE */
+    0x01,                          /* bInterfaceSubClass (DFU) */
+    0x01,                          /* bInterfaceProtocol (Runtime) */
+    0x04,                          /* iInterface (String Index 4) */
+    
+    /* DFU Functional Descriptor */
+    0x09,                          /* bLength */
+    0x21,                          /* bDescriptorType (DFU Functional) */
+    0x0B,                          /* bmAttributes (bitCanDnload | bitCanUpload | bitManifestationTolerant | bitWillDetach) */
+    0xFF, 0x00,                    /* wDetachTimeout = 255 ms */
+    0x00, 0x04,                    /* wTransferSize = 1024 bytes */
+    0x1A, 0x01                     /* bcdDFUVersion = 1.1a (DfuSe) */
 };
 
 static const uint8_t device_quality_descriptor[] = {
@@ -49,13 +91,51 @@ static const uint8_t device_quality_descriptor[] = {
 };
 
 static const uint8_t other_speed_config_descriptor_hs[] = {
-    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x02, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     CDC_ACM_DESCRIPTOR_INIT(0x00, CDC_INT_EP, CDC_OUT_EP, CDC_IN_EP, USB_BULK_EP_MPS_FS, 0x02),
+    
+    /* DFU Runtime Interface Descriptor */
+    0x09,                          /* bLength */
+    USB_DESCRIPTOR_TYPE_INTERFACE, /* bDescriptorType */
+    DFU_IF_NO,                     /* bInterfaceNumber = 2 */
+    0x00,                          /* bAlternateSetting */
+    0x00,                          /* bNumEndpoints (Control endpoint only) */
+    USB_DEVICE_CLASS_APP_SPECIFIC, /* bInterfaceClass = 0xFE */
+    0x01,                          /* bInterfaceSubClass (DFU) */
+    0x01,                          /* bInterfaceProtocol (Runtime) */
+    0x04,                          /* iInterface (String Index 4) */
+    
+    /* DFU Functional Descriptor */
+    0x09,                          /* bLength */
+    0x21,                          /* bDescriptorType (DFU Functional) */
+    0x0B,                          /* bmAttributes (bitCanDnload | bitCanUpload | bitManifestationTolerant | bitWillDetach) */
+    0xFF, 0x00,                    /* wDetachTimeout = 255 ms */
+    0x00, 0x04,                    /* wTransferSize = 1024 bytes */
+    0x1A, 0x01                     /* bcdDFUVersion = 1.1a (DfuSe) */
 };
 
 static const uint8_t other_speed_config_descriptor_fs[] = {
-    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x02, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
+    USB_OTHER_SPEED_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     CDC_ACM_DESCRIPTOR_INIT(0x00, CDC_INT_EP, CDC_OUT_EP, CDC_IN_EP, USB_BULK_EP_MPS_HS, 0x02),
+    
+    /* DFU Runtime Interface Descriptor */
+    0x09,                          /* bLength */
+    USB_DESCRIPTOR_TYPE_INTERFACE, /* bDescriptorType */
+    DFU_IF_NO,                     /* bInterfaceNumber = 2 */
+    0x00,                          /* bAlternateSetting */
+    0x00,                          /* bNumEndpoints (Control endpoint only) */
+    USB_DEVICE_CLASS_APP_SPECIFIC, /* bInterfaceClass = 0xFE */
+    0x01,                          /* bInterfaceSubClass (DFU) */
+    0x01,                          /* bInterfaceProtocol (Runtime) */
+    0x04,                          /* iInterface (String Index 4) */
+    
+    /* DFU Functional Descriptor */
+    0x09,                          /* bLength */
+    0x21,                          /* bDescriptorType (DFU Functional) */
+    0x0B,                          /* bmAttributes (bitCanDnload | bitCanUpload | bitManifestationTolerant | bitWillDetach) */
+    0xFF, 0x00,                    /* wDetachTimeout = 255 ms */
+    0x00, 0x04,                    /* wTransferSize = 1024 bytes */
+    0x1A, 0x01                     /* bcdDFUVersion = 1.1a (DfuSe) */
 };
 
 static const char *string_descriptors[] = {
@@ -63,6 +143,7 @@ static const char *string_descriptors[] = {
     "HPMicro",                    /* Manufacturer */
     "Black Magic Probe (HSlink) v0.2-bmp-hpm-port) ",           /* Product */
     "2025050401",                 /* Serial Number */
+    "Black Magic Firmware Upgrade", /* DFU Interface */
 };
 
 static const uint8_t *device_descriptor_callback(uint8_t speed)
@@ -198,6 +279,64 @@ struct usbd_endpoint cdc_in_ep = {
 static struct usbd_interface intf0;
 static struct usbd_interface intf1;
 
+/* DFU Runtime Interface */
+static struct usbd_interface intf_dfu;
+
+/* DFU Control Request Handler */
+static int dfu_control_request(uint8_t busid, struct usb_setup_packet *setup, uint8_t **data, uint32_t *len)
+{
+    (void)busid;
+    
+    /* Check if request is for DFU interface */
+    if (setup->wIndex != DFU_IF_NO)
+        return -1;  /* Not for DFU interface */
+    
+    switch (setup->bRequest) {
+    case DFU_REQUEST_GETSTATUS:
+        (*data)[0] = DFU_STATUS_OK;
+        (*data)[1] = 0;
+        (*data)[2] = 0;
+        (*data)[3] = 0;
+        (*data)[4] = DFU_STATE_APP_IDLE;  /* DFU state */
+        (*data)[5] = 0;  /* iString not used */
+        *len = 6;
+        return 0;
+        
+    case DFU_REQUEST_DETACH:
+        /* Jump to bootloader after status stage completes */
+        /* Note: CherryUSB will complete the status stage before we reset */
+        extern void platform_request_boot(void);
+        platform_request_boot();
+        /* Never returns - system resets and enters bootloader */
+        return 0;
+        
+    case DFU_REQUEST_GETSTATE:
+        (*data)[0] = DFU_STATE_APP_IDLE;
+        *len = 1;
+        return 0;
+    }
+    
+    /* Unsupported request */
+    return -1;
+}
+
+static void dfu_notify_handler(uint8_t busid, uint8_t event, void *arg)
+{
+    (void)busid;
+    (void)event;
+    (void)arg;
+}
+
+static struct usbd_interface *dfu_init_intf(struct usbd_interface *intf)
+{
+    intf->class_interface_handler = dfu_control_request;
+    intf->class_endpoint_handler = NULL;
+    intf->vendor_handler = NULL;
+    intf->notify_handler = dfu_notify_handler;
+    
+    return intf;
+}
+
 /* function ------------------------------------------------------------------*/
 
 void cdc_acm_init(uint8_t busid, uint32_t reg_base)
@@ -205,6 +344,7 @@ void cdc_acm_init(uint8_t busid, uint32_t reg_base)
     usbd_desc_register(busid, &cdc_descriptor);
     usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf0));
     usbd_add_interface(busid, usbd_cdc_acm_init_intf(busid, &intf1));
+    usbd_add_interface(busid, dfu_init_intf(&intf_dfu));  /* Add DFU Runtime interface */
     usbd_add_endpoint(busid, &cdc_out_ep);
     usbd_add_endpoint(busid, &cdc_in_ep);
     usbd_initialize(busid, reg_base, usbd_event_handler);

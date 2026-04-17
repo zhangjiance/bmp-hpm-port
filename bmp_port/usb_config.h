@@ -34,8 +34,8 @@
 
 /* descriptor common define */
 #define CONFIG_USBDEV_ADVANCE_DESC
-#define USBD_VID           0x1d50
-#define USBD_PID           0x6018
+#define USBD_VID           0x34BF  /* HPMicro VID */
+#define USBD_PID           0x0004  /* BlackMagic Probe with DFU Runtime */
 #define USBD_MAX_POWER     200
 
 /* attribute data into no cache ram */

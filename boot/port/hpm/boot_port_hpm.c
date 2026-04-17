@@ -10,8 +10,9 @@
 #include "board.h"
 #include "boot_log.h"
 
-/* Magic value for bootloader entry request stored in RAM */
-#define BOOT_MAGIC_VALUE     0x424F4F54  /* "BOOT" in ASCII */
+/* Magic values for bootloader entry request stored in RAM */
+#define BOOTMAGIC0           0xb007da7a  /* BlackMagic compatible magic 0 */
+#define BOOTMAGIC1           0xbaadfeed  /* BlackMagic compatible magic 1 */
 #define BOOT_MAGIC_ADDRESS   0xF0400000  /* AHB SRAM start */
 
 /* Bootloader entry request flag in RAM (preserved across soft reset) */
@@ -94,8 +95,9 @@ bool boot_port_check_bootloader_request(void)
     }
     
     /* Check RAM magic value for software-triggered entry */
-    if (*boot_magic_ptr == BOOT_MAGIC_VALUE) {
-        BOOT_PRINTF("[BOOT] Magic value found, staying in bootloader\r\n");
+    if (boot_magic_ptr[0] == BOOTMAGIC0 && boot_magic_ptr[1] == BOOTMAGIC1) {
+        BOOT_PRINTF("[BOOT] Magic values found (0x%08lx, 0x%08lx), staying in bootloader\r\n",
+                    (unsigned long)boot_magic_ptr[0], (unsigned long)boot_magic_ptr[1]);
         boot_port_clear_bootloader_request();
         return true;
     }
@@ -115,7 +117,8 @@ bool boot_port_check_bootloader_request(void)
  */
 void boot_port_clear_bootloader_request(void)
 {
-    *boot_magic_ptr = 0;
+    boot_magic_ptr[0] = 0;
+    boot_magic_ptr[1] = 0;
 }
 
 /**

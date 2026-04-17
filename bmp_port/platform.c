@@ -3,6 +3,13 @@
 #include "platform.h"
 #include "morse.h"
 #include "exception.h"
+#include "hpm_common.h"
+#include "hpm_soc.h"
+
+/* Bootloader entry magic value (must match bootloader definition) */
+#define BOOTMAGIC0     0xb007da7a
+#define BOOTMAGIC1     0xbaadfeed
+#define BOOT_MAGIC_RAM ((volatile uint32_t *)0xF0400000)  /* AHB SRAM start */
 
 int platform_hwversion(void)
 {
@@ -33,6 +40,16 @@ const char *platform_target_voltage(void)
 
 void platform_request_boot(void)
 {
+	/* Write magic values to RAM (preserved across soft reset) */
+	BOOT_MAGIC_RAM[0] = BOOTMAGIC0;
+	BOOT_MAGIC_RAM[1] = BOOTMAGIC1;
+	
+	/* Trigger system reset - bootloader will detect magic and stay in DFU mode */
+	HPM_PPOR->RESET_ENABLE = 0x80000000UL;
+	HPM_PPOR->SOFTWARE_RESET = 0x1000;
+	
+	/* Should never reach here */
+	while (1);
 }
 
 #pragma GCC diagnostic pop

@@ -19,7 +19,7 @@
 
 /* USB Transfer Buffer Configuration */
 #define CONFIG_USB_ALIGN_SIZE 4
-#define CONFIG_USBDEV_REQUEST_BUFFER_LEN 512
+#define CONFIG_USBDEV_REQUEST_BUFFER_LEN 1536  /* Must >= DFU transfer size (1024) */
 
 /* USB Host Configuration (needed for core compilation) */
 #define CONFIG_USBHOST_MAX_ENDPOINTS 4
@@ -37,7 +37,7 @@
 #define CONFIG_USBDEV_MSC_VERSION_STRING      "1.0"
 
 /* Enable USB Device DFU Class */
-#define CONFIG_USBDEV_DFU_TRANSFER_SIZE 512
+#define CONFIG_USBDEV_DFU_TRANSFER_SIZE 1024  /* Match USBD_DFU_XFER_SIZE in CMakeLists.txt */
 
 /* Logging Configuration */
 #ifndef USBD_LOG_LEVEL

@@ -1,5 +1,6 @@
 
 sdk_inc(.)
+sdk_inc($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu)  # Add DFU header path
 sdk_src(platform.c)
 sdk_src(cdc_acm.c)
 # sdk_src(gdb_if.c)

@@ -22,7 +22,6 @@ __app_load_addr__ = ORIGIN(XPI0) + 0x3000;
 __boot_header_length__ = __boot_header_end__ - __boot_header_start__;
 __app_offset__ = __app_load_addr__ - __boot_header_load_addr__;
 
-
 SECTIONS
 {
     .nor_cfg_option __nor_cfg_option_load_addr__ : {
