@@ -21,8 +21,15 @@
 #include "general.h"
 #include "platform.h"
 #include "board.h"
+#include "hpm_spi_accel.h"
+#include "hpm_spi_drv.h"
+#include "jtag_port.h"
 
 uint32_t target_clk_divider = UINT32_MAX;
+
+/* Global mode flag and SPI frequency */
+bool     hpm_use_spi_mode = true;
+uint32_t hpm_spi_freq_hz  = HPM_SPI_FREQ_DEFAULT_HZ;
 
 /*
  * HPM5301 Bitbang timing calibration @ 480MHz CPU:
@@ -62,9 +69,48 @@ uint32_t platform_time_ms(void)
 	return (uint32_t)current_ms;
 }
 
-__attribute__((weak)) void platform_ospeed_update(const uint32_t frequency)
+void hpm_spi_set_freq(uint32_t freq_hz)
 {
-	(void)frequency;
+        if (freq_hz > HPM_SPI_FREQ_MAX_HZ)
+                freq_hz = HPM_SPI_FREQ_MAX_HZ;
+        if (freq_hz < HPM_SPI_FREQ_MIN_HZ)
+                freq_hz = HPM_SPI_FREQ_MIN_HZ;
+        hpm_spi_freq_hz = freq_hz;
+
+        /* Update SPI2 (JTAG) timing */
+        {
+                spi_timing_config_t t = {0};
+                spi_master_get_default_timing_config(&t);
+                t.master_config.cs2sclk            = spi_cs2sclk_half_sclk_1;
+                t.master_config.csht               = spi_csht_half_sclk_1;
+                t.master_config.clk_src_freq_in_hz = clock_get_frequency(JTAG_SPI_BASE_CLOCK_NAME);
+                t.master_config.sclk_freq_in_hz    = freq_hz;
+                if (status_success != spi_master_timing_init(JTAG_SPI_BASE, &t))
+                        spi_master_set_sclk_div(JTAG_SPI_BASE, 0xFF);
+        }
+
+        /* Update SPI1 (SWD) timing */
+        {
+                spi_timing_config_t t = {0};
+                spi_master_get_default_timing_config(&t);
+                t.master_config.cs2sclk            = spi_cs2sclk_half_sclk_1;
+                t.master_config.csht               = spi_csht_half_sclk_1;
+                t.master_config.clk_src_freq_in_hz = clock_get_frequency(SWD_SPI_BASE_CLOCK_NAME);
+                t.master_config.sclk_freq_in_hz    = freq_hz;
+                if (status_success != spi_master_timing_init(SWD_SPI_BASE, &t))
+                        spi_master_set_sclk_div(SWD_SPI_BASE, 0xFF);
+        }
+}
+
+/*
+ * Called from platform_max_frequency_set before the GPIO divider calculation.
+ * In SPI mode: update SPI clock frequency.
+ * In GPIO mode: no-op (divider calculation handles it).
+ */
+void platform_ospeed_update(const uint32_t frequency)
+{
+        if (hpm_use_spi_mode && frequency)
+                hpm_spi_set_freq(frequency);
 }
 
 /*
@@ -127,8 +173,12 @@ void platform_max_frequency_set(const uint32_t frequency)
  */
 uint32_t platform_max_frequency_get(void)
 {
+	/* In SPI mode, return the configured SPI clock frequency */
+	if (hpm_use_spi_mode)
+		return hpm_spi_freq_hz;
+
 	const uint32_t cpu_freq = clock_get_frequency(clock_cpu0);
-	
+
 	/* If no delay mode, estimate based on base overhead only */
 	if (target_clk_divider == UINT32_MAX)
 		return cpu_freq / USED_SWD_CYCLES;

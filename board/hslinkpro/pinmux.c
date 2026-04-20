@@ -290,3 +290,8 @@ void init_gptmr_channel_pin(GPTMR_Type *ptr, uint32_t channel, bool as_comp)
         }
     }
 }
+
+/* Called in SWD mode to disable TDI pin - no-op when using SPI1 for SWD */
+void uninit_jtag_tdi_pin(void) {
+    /* PB13 (TDI/SPI2_MOSI) not used in SWD SPI1 mode; leave as-is */
+}
