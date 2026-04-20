@@ -103,6 +103,9 @@ static void jtagtap_reset(void)
 	jtagtap_soft_reset();
 }
 
+static bool jtagtap_next_clk_delay() __attribute__((optimize(3)));
+static bool jtagtap_next_no_delay() __attribute__((optimize(3)));
+
 static bool jtagtap_next_clk_delay()
 {
 	PIN_SWCLK_TCK_SET();
@@ -132,6 +135,9 @@ static bool jtagtap_next(const bool tms, const bool tdi)
 	else // NOLINT(readability-else-after-return)
 		return jtagtap_next_no_delay();
 }
+
+static void jtagtap_tms_seq_clk_delay(uint32_t tms_states, const size_t clock_cycles) __attribute__((optimize(3)));
+static void jtagtap_tms_seq_no_delay(uint32_t tms_states, const size_t clock_cycles) __attribute__((optimize(3)));
 
 static void jtagtap_tms_seq_clk_delay(uint32_t tms_states, const size_t clock_cycles)
 {
@@ -167,6 +173,11 @@ static void jtagtap_tms_seq(const uint32_t tms_states, const size_t clock_cycles
 	else
 		jtagtap_tms_seq_no_delay(tms_states, clock_cycles);
 }
+
+static void jtagtap_tdi_tdo_seq_clk_delay(
+	const uint8_t *const data_in, uint8_t *const data_out, const bool final_tms, const size_t clock_cycles) __attribute__((optimize(3)));
+static void jtagtap_tdi_tdo_seq_no_delay(
+	const uint8_t *const data_in, uint8_t *const data_out, const bool final_tms, const size_t clock_cycles) __attribute__((optimize(3)));
 
 static void jtagtap_tdi_tdo_seq_clk_delay(
 	const uint8_t *const data_in, uint8_t *const data_out, const bool final_tms, const size_t clock_cycles)
@@ -249,6 +260,9 @@ static void jtagtap_tdi_tdo_seq(
 		jtagtap_tdi_tdo_seq_no_delay(data_in, data_out, final_tms, clock_cycles);
 }
 
+static void jtagtap_tdi_seq_clk_delay(const uint8_t *const data_in, const bool final_tms, size_t clock_cycles) __attribute__((optimize(3)));
+static void jtagtap_tdi_seq_no_delay(const uint8_t *const data_in, const bool final_tms, size_t clock_cycles) __attribute__((optimize(3)));
+
 static void jtagtap_tdi_seq_clk_delay(const uint8_t *const data_in, const bool final_tms, size_t clock_cycles)
 {
 	for (size_t cycle = 0; cycle < clock_cycles; ++cycle) {
@@ -300,6 +314,9 @@ static void jtagtap_tdi_seq(const bool final_tms, const uint8_t *const data_in, 
 	else
 		jtagtap_tdi_seq_no_delay(data_in, final_tms, clock_cycles);
 }
+
+static void jtagtap_cycle_clk_delay(const size_t clock_cycles) __attribute__((optimize(3)));
+static void jtagtap_cycle_no_delay(const size_t clock_cycles) __attribute__((optimize(3)));
 
 static void jtagtap_cycle_clk_delay(const size_t clock_cycles)
 {
