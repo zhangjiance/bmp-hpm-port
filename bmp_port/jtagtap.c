@@ -95,10 +95,10 @@ void jtagtap_init(void)
 static void jtagtap_reset(void)
 {
 #ifdef PIN_JTAG_TRST
-	PIN_nTRST_OUT(0);
+	PIN_nTRST_CLR();
 	for (volatile size_t i = 0; i < 10000U; i++)
 		continue;
-	PIN_nTRST_OUT(1);
+	PIN_nTRST_SET();
 #endif
 	jtagtap_soft_reset();
 }
@@ -150,20 +150,18 @@ static void jtagtap_tms_seq_clk_delay(uint32_t tms_states, const size_t clock_cy
 
 static void jtagtap_tms_seq_no_delay(uint32_t tms_states, const size_t clock_cycles)
 {
-	bool state = tms_states & 1U;
 	for (size_t cycle = 0; cycle < clock_cycles; ++cycle) {
-		PIN_TMS_SWDIO_OUT(state);
+		PIN_TMS_SWDIO_OUT(tms_states & 1U);
 		PIN_SWCLK_TCK_SET();
 		/* Block the compiler from re-ordering the TMS states calculation to preserve timings */
 		tms_states >>= 1U;
-		state = tms_states & 1U;
 		PIN_SWCLK_TCK_CLR();
 	}
 }
 
 static void jtagtap_tms_seq(const uint32_t tms_states, const size_t clock_cycles)
 {
-	PIN_TDI_OUT(1);
+	PIN_TDI_SET();
 	if (target_clk_divider != UINT32_MAX)
 		jtagtap_tms_seq_clk_delay(tms_states, clock_cycles);
 	else
@@ -223,9 +221,8 @@ static void jtagtap_tdi_tdo_seq_no_delay(
 		/* Increment the cycle counter */
 		++cycle;
 		PIN_SWCLK_TCK_SET();
-		/* If TDO is high, store a 1 in the appropriate position in the value being accumulated */
-		if (PIN_TDO_IN()) /* XXX: Try to remove the need for the if here */
-			value |= 1U << bit;
+		/* Read TDO and accumulate using bitwise OR - no branch needed */
+		value |= PIN_TDO_IN() << bit;
 		/* If we've got the next whole byte, store the accumulated value and reset state */
 		if (bit == 7U) {
 			data_out[byte] = value;
@@ -244,8 +241,8 @@ static void jtagtap_tdi_tdo_seq_no_delay(
 static void jtagtap_tdi_tdo_seq(
 	uint8_t *const data_out, const bool final_tms, const uint8_t *const data_in, size_t clock_cycles)
 {
-	PIN_TMS_SWDIO_OUT(0);
-	PIN_TDI_OUT(0);
+	PIN_TMS_SWDIO_CLR();
+	PIN_TDI_CLR();
 	if (target_clk_divider != UINT32_MAX)
 		jtagtap_tdi_tdo_seq_clk_delay(data_in, data_out, final_tms, clock_cycles);
 	else
@@ -297,7 +294,7 @@ static void jtagtap_tdi_seq_no_delay(const uint8_t *const data_in, const bool fi
 
 static void jtagtap_tdi_seq(const bool final_tms, const uint8_t *const data_in, const size_t clock_cycles)
 {
-	PIN_TMS_SWDIO_OUT(0);
+	PIN_TMS_SWDIO_CLR();
 	if (target_clk_divider != UINT32_MAX)
 		jtagtap_tdi_seq_clk_delay(data_in, final_tms, clock_cycles);
 	else
