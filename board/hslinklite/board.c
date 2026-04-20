@@ -216,46 +216,47 @@ void board_init_usb_dp_dm_pins(void) {
   }
 }
 
-void board_init_clock(void) {
-  uint32_t cpu0_freq = clock_get_frequency(clock_cpu0);
+void board_init_clock(void)
+{
+    uint32_t cpu0_freq = clock_get_frequency(clock_cpu0);
 
-  if (cpu0_freq == PLLCTL_SOC_PLL_REFCLK_FREQ) {
-    /* Configure the External OSC ramp-up time: ~9ms */
-    pllctlv2_xtal_set_rampup_time(HPM_PLLCTLV2, 32UL * 1000UL * 9U);
+    if (cpu0_freq == PLLCTL_SOC_PLL_REFCLK_FREQ) {
+        /* Configure the External OSC ramp-up time: ~9ms */
+        pllctlv2_xtal_set_rampup_time(HPM_PLLCTLV2, 32UL * 1000UL * 9U);
 
-    /* Select clock setting preset1 */
-    sysctl_clock_set_preset(HPM_SYSCTL, 2);
-  }
+        /* Select clock setting preset1 */
+        sysctl_clock_set_preset(HPM_SYSCTL, 2);
+    }
 
-  /* group0[0] */
-  clock_add_to_group(clock_cpu0, 0);
-  clock_add_to_group(clock_ahb, 0);
-  clock_add_to_group(clock_lmm0, 0);
-  clock_add_to_group(clock_mchtmr0, 0);
-  clock_add_to_group(clock_rom, 0);
-  clock_add_to_group(clock_gpio, 0);
-  clock_add_to_group(clock_hdma, 0);
-  clock_add_to_group(clock_xpi0, 0);
+    /* group0[0] */
+    clock_add_to_group(clock_cpu0, 0);
+    clock_add_to_group(clock_ahb, 0);
+    clock_add_to_group(clock_lmm0, 0);
+    clock_add_to_group(clock_mchtmr0, 0);
+    clock_add_to_group(clock_rom, 0);
+    clock_add_to_group(clock_gpio, 0);
+    clock_add_to_group(clock_hdma, 0);
+    clock_add_to_group(clock_xpi0, 0);
 
-  /* Connect Group0 to CPU0 */
-  clock_connect_group_to_cpu(0, 0);
+    /* Connect Group0 to CPU0 */
+    clock_connect_group_to_cpu(0, 0);
 
-  /* Bump up DCDC voltage to 1175mv */
-  pcfg_dcdc_set_voltage(HPM_PCFG, 1175);
+    /* Bump up DCDC voltage to 1275mv */
+    pcfg_dcdc_set_voltage(HPM_PCFG, 1275);
 
-  /* Configure CPU to 360MHz, AXI/AHB to 120MHz */
-  sysctl_config_cpu0_domain_clock(HPM_SYSCTL, clock_source_pll0_clk0, 2, 3);
-  /* Configure PLL0 Post Divider */
-  pllctlv2_set_postdiv(HPM_PLLCTLV2, 0, 0, 0); /* PLL0CLK0: 720MHz */
-  pllctlv2_set_postdiv(HPM_PLLCTLV2, 0, 1, 3); /* PLL0CLK1: 450MHz */
-  pllctlv2_set_postdiv(HPM_PLLCTLV2, 0, 2, 7); /* PLL0CLK2: 300MHz */
-  /* Configure PLL0 Frequency to 720MHz */
-  pllctlv2_init_pll_with_freq(HPM_PLLCTLV2, 0, 720000000);
+    /* Configure CPU to 480MHz, AXI/AHB to 160MHz */
+    sysctl_config_cpu0_domain_clock(HPM_SYSCTL, clock_source_pll0_clk0, 2, 3);
+    /* Configure PLL0 Post Divider */
+    pllctlv2_set_postdiv(HPM_PLLCTLV2, pllctlv2_pll0, pllctlv2_clk0, pllctlv2_div_1p0);    /* PLL0CLK0: 960MHz */
+    pllctlv2_set_postdiv(HPM_PLLCTLV2, pllctlv2_pll0, pllctlv2_clk1, pllctlv2_div_1p6);    /* PLL0CLK1: 600MHz */
+    pllctlv2_set_postdiv(HPM_PLLCTLV2, pllctlv2_pll0, pllctlv2_clk2, pllctlv2_div_2p4);    /* PLL0CLK2: 400MHz */
+    /* Configure PLL0 Frequency to 960MHz */
+    pllctlv2_init_pll_with_freq(HPM_PLLCTLV2, pllctlv2_pll0, 960000000);
 
-  clock_update_core_clock();
+    clock_update_core_clock();
 
-  /* Configure mchtmr to 24MHz */
-  clock_set_source_divider(clock_mchtmr0, clk_src_osc24m, 1);
+    /* Configure mchtmr to 24MHz */
+    clock_set_source_divider(clock_mchtmr0, clk_src_osc24m, 1);
 }
 
 void board_delay_us(uint32_t us) { clock_cpu_delay_us(us); }
