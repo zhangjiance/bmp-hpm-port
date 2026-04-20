@@ -58,12 +58,10 @@ static bool cmd_bit_mode(target_s *t, int argc, const char **argv)
     if (strcmp(argv[1], "spi") == 0) {
         hpm_use_spi_mode = true;
         hpm_jtag_setup_mode();
-        hpm_swd_setup_mode();
         gdb_outf("SPI mode @ %uMHz. Re-scan to use.\n", hpm_spi_freq_hz / 1000000U);
     } else if (strcmp(argv[1], "gpio") == 0) {
         hpm_use_spi_mode = false;
         hpm_jtag_setup_mode();
-        hpm_swd_setup_mode();
         gdb_outf("GPIO bitbang mode. Re-scan to use.\n");
     } else {
         gdb_outf("Unknown mode '%s'. Use: bit_mode spi [freq_mhz] | bit_mode gpio\n", argv[1]);

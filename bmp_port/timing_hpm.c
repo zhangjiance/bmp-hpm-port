@@ -142,7 +142,7 @@ void platform_max_frequency_set(const uint32_t frequency)
 	uint32_t divisor = cpu_freq - USED_SWD_CYCLES * frequency;
 	
 	/* If this wrapped to a huge number (frequency too high), use no delay */
-	if (divisor >= 0x80000000U) {
+	if (divisor >= 0x20000000U) {
 		target_clk_divider = UINT32_MAX;
 		return;
 	}
