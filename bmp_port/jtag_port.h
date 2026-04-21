@@ -81,6 +81,17 @@
 #define SWDIO_DIR_PIN_IDX   GPIO_GET_PIN_INDEX(SWDIO_DIR)
 #define SWDIO_DIR_PIN_MASK  (1U << SWDIO_DIR_PIN_IDX)
 
+/* Standard PAD configuration for high-speed signals */
+#define PAD_CTL_FAST            (IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3))
+#define PAD_CTL_FAST_PULLDOWN   (PAD_CTL_FAST | IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0))
+
+/* Delay for clock cycle timing */
+__STATIC_FORCEINLINE void delay_clk_cycles(uint32_t cycles)
+{
+    for (volatile uint32_t counter = cycles; counter > 0; --counter)
+        continue;
+}
+
 __STATIC_FORCEINLINE void PIN_SWCLK_TCK_SET(void)
 {
     PIN_GPIO->DO[TCK_PORT_IDX].SET = TCK_PIN_MASK;

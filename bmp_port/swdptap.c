@@ -71,18 +71,13 @@ static void swd_spi_pins_setup(void) {
       IOC_PA27_FUNC_CTL_SPI1_SCLK | IOC_PAD_FUNC_CTL_LOOP_BACK_SET(1);
   HPM_IOC->PAD[IOC_PAD_PA28].FUNC_CTL = IOC_PA28_FUNC_CTL_SPI1_MISO;
   HPM_IOC->PAD[IOC_PAD_PA29].FUNC_CTL = IOC_PA29_FUNC_CTL_SPI1_MOSI;
-  HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3) |
-      IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0);
-  HPM_IOC->PAD[IOC_PAD_PA29].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
+  HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL = PAD_CTL_FAST_PULLDOWN;
+  HPM_IOC->PAD[IOC_PAD_PA29].PAD_CTL = PAD_CTL_FAST;
   /* PB11: Set as GPIO input (high-Z) to avoid conflict with PA27 (SPI drives
    * SWDCLK) */
   HPM_IOC->PAD[IOC_PAD_PB11].FUNC_CTL = IOC_PB11_FUNC_CTL_GPIO_B_11;
-  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
+  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL = PAD_CTL_FAST;
   gpio_set_pin_input(PIN_GPIO, 1, 11); /* Port B=1, Pin 11 */
   /* Reset turnaround state for SPI mode */
   swd_spi_current_dir = SWDIO_SPI_STATUS_DRIVE;
@@ -99,16 +94,11 @@ static void swd_gpio_pins_setup(void) {
   HPM_IOC->PAD[IOC_PAD_PA28].FUNC_CTL = IOC_PA28_FUNC_CTL_GPIO_A_28;
   HPM_IOC->PAD[IOC_PAD_PA29].FUNC_CTL = IOC_PA29_FUNC_CTL_GPIO_A_29;
   HPM_IOC->PAD[IOC_PAD_PB11].FUNC_CTL = IOC_PB11_FUNC_CTL_GPIO_B_11;
-  HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  /* PA29 (SWDIO): needs pull-up for stable reads when target drives the line */
-  HPM_IOC->PAD[IOC_PAD_PA29].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3) |
-      IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0);
-  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
+  HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL = PAD_CTL_FAST;
+  /* PA29 (SWDIO): needs pull-down for stable reads when target drives the line */
+  HPM_IOC->PAD[IOC_PAD_PA29].PAD_CTL = PAD_CTL_FAST_PULLDOWN;
+  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL = PAD_CTL_FAST;
   /* GPIO mode: PB11 drives SWCLK, PA29 drives SWDIO (bidirectional)
    * Set PA27 and PA28 as input (high-Z) to avoid conflicts:
    *   - PA27 high-Z: won't conflict with PB11 on SWDCLK network
@@ -323,13 +313,9 @@ static void swdptap_turnaround(const swdio_status_t dir) {
   }
 
   /* Turnaround clock cycle after direction change */
-  for (volatile uint32_t counter = target_clk_divider + 1; counter > 0;
-       --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider + 1);
   PIN_SWCLK_TCK_SET();
-  for (volatile uint32_t counter = target_clk_divider + 1; counter > 0;
-       --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider + 1);
   PIN_SWCLK_TCK_CLR();
 }
 
@@ -344,14 +330,12 @@ static uint32_t swdptap_seq_in_clk_delay(const size_t clock_cycles) {
     return 0;
   for (size_t cycle = clock_cycles; cycle--;) {
     /* Delay while CLK is low */
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
     /* Read bit before rising edge */
     const bool bit = !!PIN_TMS_SWDIO_IN();
     PIN_SWCLK_TCK_SET();
     /* Delay while CLK is high (same as low for 50% duty cycle) */
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
     value >>= 1U;
     value |= (uint32_t)bit << 31U;
     PIN_SWCLK_TCK_CLR();
@@ -366,9 +350,7 @@ static uint32_t swdptap_seq_in_no_delay(const size_t clock_cycles) {
     return 0;
   for (size_t cycle = clock_cycles; cycle--;) {
     const uint32_t bit = PIN_TMS_SWDIO_IN();
-    /* Memory barrier */
     PIN_SWCLK_TCK_SET();
-    __asm volatile("nop" ::: "memory");
     __asm volatile("nop" ::: "memory");
     value >>= 1U;
     value |= bit << 31U;
@@ -388,14 +370,10 @@ static uint32_t swdptap_seq_in_gpio(size_t clock_cycles) {
 
 static bool swdptap_seq_in_parity_gpio(uint32_t *ret, size_t clock_cycles) {
   const uint32_t result = swdptap_seq_in_gpio(clock_cycles);
-  for (volatile uint32_t counter = target_clk_divider + 1; counter > 0;
-       --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider + 1);
   const uint32_t bit = PIN_TMS_SWDIO_IN();
   PIN_SWCLK_TCK_SET();
-  for (volatile uint32_t counter = target_clk_divider + 1; counter > 0;
-       --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider + 1);
   PIN_SWCLK_TCK_CLR();
   swdptap_turnaround(SWDIO_STATUS_DRIVE);
   *ret = result;
@@ -414,18 +392,11 @@ static void swdptap_seq_out_clk_delay(const uint32_t tms_states,
   if (!clock_cycles)
     return;
   for (size_t cycle = clock_cycles; cycle--;) {
-    /* Memory barrier */
-    __asm volatile("" ::: "memory");
     PIN_TMS_SWDIO_OUT(value & 1U);
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
     PIN_SWCLK_TCK_SET();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
-    __asm volatile("nop" ::: "memory");
+    delay_clk_cycles(target_clk_divider);
     value >>= 1U;
-    /* Memory barrier */
-    __asm volatile("" ::: "memory");
     PIN_SWCLK_TCK_CLR();
   }
 }
@@ -436,15 +407,11 @@ static void swdptap_seq_out_no_delay(const uint32_t tms_states,
   if (!clock_cycles)
     return;
   for (size_t cycle = clock_cycles; cycle--;) {
-    /* Memory barrier */
-    __asm volatile("" ::: "memory");
     PIN_SWCLK_TCK_CLR();
     PIN_TMS_SWDIO_OUT(value & 1U);
     PIN_SWCLK_TCK_SET();
     __asm volatile("nop" ::: "memory");
     value >>= 1U;
-    /* Memory barrier */
-    __asm volatile("" ::: "memory");
   }
   PIN_SWCLK_TCK_CLR();
 }
@@ -463,13 +430,9 @@ static void swdptap_seq_out_parity_gpio(const uint32_t tms_states,
   const bool parity = calculate_odd_parity(tms_states);
   swdptap_seq_out_gpio(tms_states, clock_cycles);
   PIN_TMS_SWDIO_OUT(parity);
-  for (volatile uint32_t counter = target_clk_divider + 1; counter > 0;
-       --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider + 1);
   PIN_SWCLK_TCK_SET();
-  for (volatile uint32_t counter = target_clk_divider + 1; counter > 0;
-       --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider + 1);
   PIN_SWCLK_TCK_CLR();
 }
 
