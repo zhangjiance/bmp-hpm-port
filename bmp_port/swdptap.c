@@ -33,6 +33,17 @@
 
 swd_proc_s swd_proc;
 
+/*
+ * SPI mode SWD transfer state tracking.
+ * SWD protocol requires turnaround cycles when switching SWDIO direction.
+ */
+typedef enum swdio_status_spi_e {
+	SWDIO_SPI_STATUS_FLOAT = 0,  /* SWDIO is input (target drives) */
+	SWDIO_SPI_STATUS_DRIVE       /* SWDIO is output (host drives) */
+} swdio_status_spi_t;
+
+static swdio_status_spi_t swd_spi_current_dir = SWDIO_SPI_STATUS_DRIVE;
+
 /* =================================================================
  * SPI-accelerated SWD (SPI1: PA27=SCLK, PA28=MISO, PA29=MOSI)
  * PB11 is physically connected to PA27 on PCB (same SWDCLK net)
@@ -112,8 +123,9 @@ control_config.common_config.data_phase_fmt    = spi_single_io_mode;
 control_config.common_config.dummy_cnt         = spi_dummy_count_1;
 spi_control_init(SWD_SPI_BASE, &control_config, 1, 1);
 
-/* Default: SWDIO as input (DIR=0), matching CherryDAP */
-PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].CLEAR = SWDIO_DIR_PIN_MASK;
+/* Initialize SWDIO_DIR and state tracking */
+swd_spi_current_dir = SWDIO_SPI_STATUS_DRIVE;  /* Start in output mode */
+PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;  /* DIR=1 (output) */
 }
 
 static inline void swd_spi_reset(void)
@@ -128,8 +140,7 @@ static void swd_spi_write_bits(uint32_t data, uint16_t nbits)
 if (!nbits)
 return;
 swd_spi_reset();
-/* Set SWDIO_DIR=1 for output, matching CherryDAP */
-PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
+/* Note: SWDIO_DIR is controlled by swd_spi_turnaround(), not here */
 SWD_SPI_BASE->TRANSCTRL = (SWD_SPI_BASE->TRANSCTRL &
 ~(SPI_TRANSCTRL_TRANSMODE_MASK | SPI_TRANSCTRL_WRTRANCNT_MASK)) |
 SPI_TRANSCTRL_TRANSMODE_SET(spi_trans_write_only) |
@@ -146,8 +157,7 @@ static uint32_t swd_spi_read_bits(uint16_t nbits)
 if (!nbits)
 return 0;
 swd_spi_reset();
-/* Set SWDIO_DIR=0 for input, matching CherryDAP */
-PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].CLEAR = SWDIO_DIR_PIN_MASK;
+/* Note: SWDIO_DIR is controlled by swd_spi_turnaround(), not here */
 SWD_SPI_BASE->TRANSCTRL = (SWD_SPI_BASE->TRANSCTRL &
 ~(SPI_TRANSCTRL_TRANSMODE_MASK | SPI_TRANSCTRL_RDTRANCNT_MASK)) |
 SPI_TRANSCTRL_TRANSMODE_SET(spi_trans_read_only) |
@@ -171,18 +181,49 @@ static bool swdptap_seq_in_parity_spi(uint32_t *ret, size_t clock_cycles);
 static void swdptap_seq_out_spi(uint32_t tms_states, size_t clock_cycles);
 static void swdptap_seq_out_parity_spi(uint32_t tms_states, size_t clock_cycles);
 
+/*
+ * SWD protocol turnaround: 1 clock cycle with SWDIO in specified direction.
+ * Turnaround is required when changing SWDIO direction between host and target.
+ */
+static void swd_spi_turnaround(swdio_status_spi_t new_dir)
+{
+	if (new_dir == swd_spi_current_dir)
+		return;
+	
+	swd_spi_current_dir = new_dir;
+	
+	/* Set SWDIO_DIR based on new direction */
+	if (new_dir == SWDIO_SPI_STATUS_FLOAT) {
+		/* Target drives SWDIO: set DIR=0 (input) */
+		PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].CLEAR = SWDIO_DIR_PIN_MASK;
+	} else {
+		/* Host drives SWDIO: set DIR=1 (output) */
+		PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
+	}
+	
+	/* Perform 1 turnaround clock cycle */
+	if (new_dir == SWDIO_SPI_STATUS_FLOAT) {
+		/* Switching to input: read and discard 1 bit */
+		swd_spi_read_bits(1);
+	} else {
+		/* Switching to output: write 1 bit (value doesn't matter) */
+		swd_spi_write_bits(0, 1);
+	}
+}
+
 static uint32_t swdptap_seq_in_spi(size_t clock_cycles)
 {
 if (!clock_cycles)
 return 0;
+swd_spi_turnaround(SWDIO_SPI_STATUS_FLOAT);
 return swd_spi_read_bits((uint16_t)clock_cycles);
 }
 
 static bool swdptap_seq_in_parity_spi(uint32_t *ret, size_t clock_cycles)
 {
-uint32_t result    = swdptap_seq_in_spi(clock_cycles);
+swd_spi_turnaround(SWDIO_SPI_STATUS_FLOAT);
+uint32_t result    = swd_spi_read_bits((uint16_t)clock_cycles);
 uint32_t parity_bit = swd_spi_read_bits(1) & 1U;
-/* Keep SWDIO_DIR=0 after read, matching CherryDAP */
 *ret = result;
 return calculate_odd_parity(result) == (bool)parity_bit;
 }
@@ -191,13 +232,15 @@ static void swdptap_seq_out_spi(uint32_t tms_states, size_t clock_cycles)
 {
 if (!clock_cycles)
 return;
+swd_spi_turnaround(SWDIO_SPI_STATUS_DRIVE);
 swd_spi_write_bits(tms_states, (uint16_t)clock_cycles);
 }
 
 static void swdptap_seq_out_parity_spi(uint32_t tms_states, size_t clock_cycles)
 {
 const bool parity = calculate_odd_parity(tms_states);
-swdptap_seq_out_spi(tms_states, clock_cycles);
+swd_spi_turnaround(SWDIO_SPI_STATUS_DRIVE);
+swd_spi_write_bits(tms_states, (uint16_t)clock_cycles);
 swd_spi_write_bits(parity ? 1U : 0U, 1);
 }
 
