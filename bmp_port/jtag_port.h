@@ -257,6 +257,15 @@ __STATIC_INLINE uint32_t TIMESTAMP_GET(void)
     return current_us;
 }
 
+/***************************************Variables Declaration***********************************/
+
+/*************************************Function Declaration**************************************/
+
+/* Dynamic clock selection for SPI peripherals (SWD/JTAG)
+ * Enumerates all available PLLs and finds optimal configuration.
+ * Returns actual frequency achieved in Hz. */
+uint32_t select_optimal_clock_config(clock_name_t clock_name, uint32_t freq_hz, 
+                                      clk_src_t *best_clk_src, uint32_t *best_div);
 
 #endif
 /* [] END OF jtag_port.h */

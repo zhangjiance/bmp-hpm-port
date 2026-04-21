@@ -114,76 +114,6 @@ static void swd_gpio_pins_setup(void) {
   swd_current_mode = SWD_MODE_GPIO;
 }
 
-/* Dynamic clock selection algorithm from CherryDAP HSLink-Pro.
- * Enumerate all available clock sources (clock_source_general_source_end),
- * find the PLL/divider combination that produces frequency closest to target.
- * 
- * Parameters:
- *   freq_hz: Target frequency in Hz
- *   best_clk_src: Output - selected clock source
- *   best_div: Output - selected divider (1-256)
- * 
- * Returns: Actual frequency achieved in Hz
- */
-static uint32_t select_optimal_clock_config(uint32_t freq_hz, clk_src_t *best_clk_src, uint32_t *best_div) {
-  uint32_t freq_list[clock_source_general_source_end] = {0};
-  uint32_t pll_freq, div;
-  int min_diff_freq = INT32_MAX;
-  int current_diff_freq;
-  uint32_t best_freq = 0;
-  
-  /* Enumerate all general clock sources to build frequency list */
-  for (clock_source_t src = clock_source_osc0_clk0; src < clock_source_general_source_end; src++) {
-    /* Convert clock_source_t to clk_src_t (they have same enum values) */
-    clk_src_t clk_src = (clk_src_t)src;
-    
-    /* Probe PLL frequency by temporarily setting divider=1 */
-    clock_set_source_divider(SWD_SPI_BASE_CLOCK_NAME, clk_src, 1);
-    pll_freq = clock_get_frequency(SWD_SPI_BASE_CLOCK_NAME);
-    
-    if (pll_freq == 0)
-      continue; /* Skip disabled PLLs */
-    
-    /* Calculate divider needed to reach target frequency (range: 1-256) */
-    div = pll_freq / freq_hz;
-    if (div > 0 && div <= 256) {
-      freq_list[src] = pll_freq / div;
-    }
-  }
-  
-  /* Find the frequency with minimum error */
-  for (int i = 0; i < clock_source_general_source_end; i++) {
-    if (freq_list[i] == 0)
-      continue;
-    
-    current_diff_freq = (freq_list[i] > freq_hz) ? 
-                        (freq_list[i] - freq_hz) : (freq_hz - freq_list[i]);
-    
-    if (current_diff_freq < min_diff_freq) {
-      min_diff_freq = current_diff_freq;
-      best_freq = freq_list[i];
-    }
-  }
-  
-  /* Find which source produces the best frequency */
-  *best_clk_src = clk_src_pll0_clk2; /* Default fallback */
-  *best_div = 1;
-  
-  for (int i = 0; i < clock_source_general_source_end; i++) {
-    if (best_freq == freq_list[i]) {
-      *best_clk_src = (clk_src_t)i;
-      
-      /* Recalculate PLL frequency for this source */
-      clock_set_source_divider(SWD_SPI_BASE_CLOCK_NAME, *best_clk_src, 1);
-      pll_freq = clock_get_frequency(SWD_SPI_BASE_CLOCK_NAME);
-      *best_div = pll_freq / best_freq;
-      break;
-    }
-  }
-  
-  return best_freq;
-}
-
 static void swd_spi_init_with_freq(uint32_t freq_hz) {
   spi_timing_config_t timing_config = {0};
   spi_format_config_t format_config = {0};
@@ -192,7 +122,7 @@ static void swd_spi_init_with_freq(uint32_t freq_hz) {
   uint32_t best_div;
   
   /* Use dynamic clock selection algorithm to find optimal configuration */
-  select_optimal_clock_config(freq_hz, &best_clk_src, &best_div);
+  select_optimal_clock_config(SWD_SPI_BASE_CLOCK_NAME, freq_hz, &best_clk_src, &best_div);
   
   /* Apply the selected configuration */
   clock_set_source_divider(SWD_SPI_BASE_CLOCK_NAME, best_clk_src, best_div);

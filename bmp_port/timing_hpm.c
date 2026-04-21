@@ -24,6 +24,7 @@
 #include "hpm_spi_accel.h"
 #include "hpm_spi_drv.h"
 #include "jtag_port.h"
+#include <limits.h>
 
 uint32_t target_clk_divider = UINT32_MAX ;
 
@@ -188,5 +189,77 @@ uint32_t platform_max_frequency_get(void)
 	
 	/* Return actual frequency */
 	return cpu_freq / cycles_per_clock;
+}
+
+/* Dynamic clock selection algorithm from CherryDAP HSLink-Pro.
+ * Enumerate all available clock sources (clock_source_general_source_end),
+ * find the PLL/divider combination that produces frequency closest to target.
+ * 
+ * Parameters:
+ *   clock_name: Target clock (e.g., clock_spi1, clock_spi2)
+ *   freq_hz: Target frequency in Hz
+ *   best_clk_src: Output - selected clock source
+ *   best_div: Output - selected divider (1-256)
+ * 
+ * Returns: Actual frequency achieved in Hz
+ */
+uint32_t select_optimal_clock_config(clock_name_t clock_name, uint32_t freq_hz, 
+                                      clk_src_t *best_clk_src, uint32_t *best_div) {
+  uint32_t freq_list[clock_source_general_source_end] = {0};
+  uint32_t pll_freq, div;
+  int min_diff_freq = INT_MAX;
+  int current_diff_freq;
+  uint32_t best_freq = 0;
+  
+  /* Enumerate all general clock sources to build frequency list */
+  for (clock_source_t src = clock_source_osc0_clk0; src < clock_source_general_source_end; src++) {
+    /* Convert clock_source_t to clk_src_t (they have same enum values) */
+    clk_src_t clk_src = (clk_src_t)src;
+    
+    /* Probe PLL frequency by temporarily setting divider=1 */
+    clock_set_source_divider(clock_name, clk_src, 1);
+    pll_freq = clock_get_frequency(clock_name);
+    
+    if (pll_freq == 0)
+      continue; /* Skip disabled PLLs */
+    
+    /* Calculate divider needed to reach target frequency (range: 1-256) */
+    div = pll_freq / freq_hz;
+    if (div > 0 && div <= 256) {
+      freq_list[src] = pll_freq / div;
+    }
+  }
+  
+  /* Find the frequency with minimum error */
+  for (int i = 0; i < clock_source_general_source_end; i++) {
+    if (freq_list[i] == 0)
+      continue;
+    
+    current_diff_freq = (freq_list[i] > freq_hz) ? 
+                        (freq_list[i] - freq_hz) : (freq_hz - freq_list[i]);
+    
+    if (current_diff_freq < min_diff_freq) {
+      min_diff_freq = current_diff_freq;
+      best_freq = freq_list[i];
+    }
+  }
+  
+  /* Find which source produces the best frequency */
+  *best_clk_src = clk_src_pll0_clk2; /* Default fallback */
+  *best_div = 1;
+  
+  for (int i = 0; i < clock_source_general_source_end; i++) {
+    if (best_freq == freq_list[i]) {
+      *best_clk_src = (clk_src_t)i;
+      
+      /* Recalculate PLL frequency for this source */
+      clock_set_source_divider(clock_name, *best_clk_src, 1);
+      pll_freq = clock_get_frequency(clock_name);
+      *best_div = pll_freq / best_freq;
+      break;
+    }
+  }
+  
+  return best_freq;
 }
  

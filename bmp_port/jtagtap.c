@@ -98,7 +98,14 @@ static void jtag_spi_init_with_freq(uint32_t freq_hz) {
   spi_timing_config_t timing_config = {0};
   spi_format_config_t format_config = {0};
   spi_control_config_t control_config = {0};
+  clk_src_t best_clk_src;
+  uint32_t best_div;
 
+  /* Use dynamic clock selection algorithm to find optimal configuration */
+  select_optimal_clock_config(JTAG_SPI_BASE_CLOCK_NAME, freq_hz, &best_clk_src, &best_div);
+  
+  /* Apply the selected configuration */
+  clock_set_source_divider(JTAG_SPI_BASE_CLOCK_NAME, best_clk_src, best_div);
   uint32_t spi_clock = clock_get_frequency(JTAG_SPI_BASE_CLOCK_NAME);
 
   spi_master_get_default_timing_config(&timing_config);
