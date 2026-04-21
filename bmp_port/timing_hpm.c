@@ -33,23 +33,36 @@ bool     hpm_use_spi_mode = true;
 uint32_t hpm_spi_freq_hz  = HPM_SPI_FREQ_DEFAULT_HZ;
 
 /*
- * HPM5301 Bitbang timing calibration @ 480MHz CPU:
+ * HPM5361 GPIO Bitbang Timing Calibration @ 480MHz CPU
  * 
- * Based on actual measurement: 10MHz setting → 3.7MHz actual
+ * Based on empirical measurement with RISC-V assembly delay loop:
  * 
- * Analysis from disassembly:
- * - Each GPIO write (sw) + fence io,io: ~15-25 CPU cycles
- * - Each bitbang clock has: 3 GPIO writes + 3 fences ≈ 60-80 cycles base overhead
- * - Each delay loop iteration: lw+addi+sw+lw+beqz+j = ~10-15 cycles (with stalls)
- * - Two delay loops per clock cycle
+ * Measured Data:
+ * div=0:  18.0 MHz (no delay)
+ * div=1:  15.0 MHz
+ * div=2:  14.0 MHz
+ * div=10:  7.0 MHz
+ * div=50:  2.0 MHz
+ * div=100: 1.1 MHz
+ * div=200: 579 KHz
  * 
- * Formula (similar to STM32):
- * cycles_needed = CPU_freq / target_freq
- * divisor = (CPU_freq - USED_CYCLES * target_freq) / 2
- * divider = divisor / (CYCLES_PER_CNT * target_freq)
+ * Analysis:
+ * - Base overhead (GPIO ops + fences): 480M/18M ≈ 27 CPU cycles
+ * - Each delay iteration (addi + bnez): ~2 CPU cycles (RISC-V assembly optimized)
+ * - Each SWD clock has 2 delay calls: total = 27 + 2*divider*2 = 27 + 4*divider
+ * 
+ * Formula: freq = CPU_freq / (27 + 2*divider*2)
+ * Reverse: divider = (CPU_freq/freq - 27) / 4
+ * 
+ * Verification:
+ * div=1:  480M/(27+4)   = 15.48 MHz ✓
+ * div=10: 480M/(27+40)  = 7.16 MHz  ✓
+ * div=50: 480M/(27+200) = 2.11 MHz  ✓
+ *
+ * Adjustable via 'mon timing <used_cycles> <cycles_per_cnt>' or 'mon timing div <value>'
  */
-#define USED_SWD_CYCLES 60U     /* Base overhead: GPIO ops + fences per clock */
-#define CYCLES_PER_CNT  25U     /* CPU cycles per delay loop iteration (with stalls) */
+uint32_t hpm_gpio_used_cycles = 27U;    /* Base overhead: GPIO ops + fences per clock */
+uint32_t hpm_gpio_cycles_per_cnt = 2U;  /* CPU cycles per delay loop iteration (assembly optimized) */
 
 void platform_timing_init(void)
 {
@@ -140,7 +153,7 @@ void platform_max_frequency_set(const uint32_t frequency)
 	const uint32_t cpu_freq = clock_get_frequency(clock_cpu0);
 	
 	/* Calculate: divisor = CPU_freq - USED_CYCLES * target_freq */
-	uint32_t divisor = cpu_freq - USED_SWD_CYCLES * frequency;
+	uint32_t divisor = cpu_freq - hpm_gpio_used_cycles * frequency;
 	
 	/* If this wrapped to a huge number (frequency too high), use no delay */
 	if (divisor >= 0x20000000U) {
@@ -158,10 +171,10 @@ void platform_max_frequency_set(const uint32_t frequency)
 	divisor /= 2U;
 	
 	/* Calculate divider = divisor / (CYCLES_PER_CNT * frequency) */
-	target_clk_divider = divisor / (CYCLES_PER_CNT * frequency);
+	target_clk_divider = divisor / (hpm_gpio_cycles_per_cnt * frequency);
 	
 	/* Round up if needed */
-	if (target_clk_divider * (CYCLES_PER_CNT * frequency) < divisor)
+	if (target_clk_divider * (hpm_gpio_cycles_per_cnt * frequency) < divisor)
 		++target_clk_divider;
 }
 
@@ -182,10 +195,10 @@ uint32_t platform_max_frequency_get(void)
 
 	/* If no delay mode, estimate based on base overhead only */
 	if (target_clk_divider == UINT32_MAX)
-		return cpu_freq / USED_SWD_CYCLES;
+		return cpu_freq / hpm_gpio_used_cycles;
 	
 	/* Calculate total cycles per clock */
-	const uint32_t cycles_per_clock = USED_SWD_CYCLES + 2U * target_clk_divider * CYCLES_PER_CNT;
+	const uint32_t cycles_per_clock = hpm_gpio_used_cycles + 2U * target_clk_divider * hpm_gpio_cycles_per_cnt;
 	
 	/* Return actual frequency */
 	return cpu_freq / cycles_per_clock;

@@ -18,6 +18,11 @@ extern bool hpm_use_spi_mode;
 /* Current SPI target frequency (applies when hpm_use_spi_mode == true) */
 extern uint32_t hpm_spi_freq_hz;
 
+/* GPIO bitbang timing calibration parameters */
+extern uint32_t hpm_gpio_used_cycles;     /* Base overhead cycles per clock */
+extern uint32_t hpm_gpio_cycles_per_cnt;  /* CPU cycles per delay loop iteration */
+extern uint32_t target_clk_divider;       /* Current GPIO delay divider */
+
 /*
  * Reconfigure JTAG/SWD pins and update jtag_proc/swd_proc function pointers
  * based on the current value of hpm_use_spi_mode.

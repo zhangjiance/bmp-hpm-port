@@ -294,11 +294,6 @@ static void swdptap_seq_out_parity_gpio(uint32_t tms_states,
                                         size_t clock_cycles)
     __attribute__((optimize(3)));
 
-/* Get actual delay cycles for current clock divider setting */
-static uint32_t swdptap_gpio_delay_cycles(void) {
-  return target_clk_divider == UINT32_MAX ? SWD_GPIO_NO_DELAY_CYCLES : target_clk_divider;
-}
-
 static void swdptap_turnaround(const swdio_status_t dir) {
   static swdio_status_t olddir = SWDIO_STATUS_FLOAT;
   /* 
@@ -325,7 +320,7 @@ static void swdptap_turnaround(const swdio_status_t dir) {
   }
 
   /* Turnaround clock cycle after direction change */
-  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
+  const uint32_t delay_cycles = platform_gpio_delay_cycles();
   delay_clk_cycles(delay_cycles);
   PIN_SWCLK_TCK_SET();
   delay_clk_cycles(delay_cycles);
@@ -334,7 +329,7 @@ static void swdptap_turnaround(const swdio_status_t dir) {
 
 static uint32_t swdptap_seq_in_gpio(const size_t clock_cycles) {
   uint32_t value = 0;
-  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
+  const uint32_t delay_cycles = platform_gpio_delay_cycles();
   swdptap_turnaround(SWDIO_STATUS_FLOAT);
   if (!clock_cycles)
     return 0;
@@ -350,7 +345,7 @@ static uint32_t swdptap_seq_in_gpio(const size_t clock_cycles) {
 
 static bool swdptap_seq_in_parity_gpio(uint32_t *ret, size_t clock_cycles) {
   const uint32_t result = swdptap_seq_in_gpio(clock_cycles);
-  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
+  const uint32_t delay_cycles = platform_gpio_delay_cycles();
   delay_clk_cycles(delay_cycles);
   const uint32_t bit = PIN_TMS_SWDIO_IN();
   PIN_SWCLK_TCK_SET();
@@ -365,7 +360,7 @@ static bool swdptap_seq_in_parity_gpio(uint32_t *ret, size_t clock_cycles) {
 static void swdptap_seq_out_gpio(const uint32_t tms_states,
                                  const size_t clock_cycles) {
   uint32_t value = tms_states;
-  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
+  const uint32_t delay_cycles = platform_gpio_delay_cycles();
   swdptap_turnaround(SWDIO_STATUS_DRIVE);
   if (!clock_cycles)
     return;
@@ -382,7 +377,7 @@ static void swdptap_seq_out_gpio(const uint32_t tms_states,
 static void swdptap_seq_out_parity_gpio(const uint32_t tms_states,
                                         const size_t clock_cycles) {
   const bool parity = calculate_odd_parity(tms_states);
-  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
+  const uint32_t delay_cycles = platform_gpio_delay_cycles();
   swdptap_seq_out_gpio(tms_states, clock_cycles);
   PIN_TMS_SWDIO_OUT(parity);
   delay_clk_cycles(delay_cycles);
