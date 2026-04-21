@@ -85,9 +85,14 @@
 #define PAD_CTL_FAST            (IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3))
 #define PAD_CTL_FAST_PULLDOWN   (PAD_CTL_FAST | IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0))
 
-/* Delay for clock cycle timing */
+/* GPIO SWD fallback delay when no explicit divider is configured. */
+#define SWD_GPIO_NO_DELAY_CYCLES  0U
+
+/* Delay for clock cycle timing - optimized for zero-delay case */
 __STATIC_FORCEINLINE void delay_clk_cycles(uint32_t cycles)
 {
+    if (!cycles)
+        return;
     for (volatile uint32_t counter = cycles; counter > 0; --counter)
         continue;
 }

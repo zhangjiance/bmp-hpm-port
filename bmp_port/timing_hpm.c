@@ -25,7 +25,7 @@
 #include "hpm_spi_drv.h"
 #include "jtag_port.h"
 
-uint32_t target_clk_divider = UINT32_MAX;
+uint32_t target_clk_divider = UINT32_MAX ;
 
 /* Global mode flag and SPI frequency */
 bool     hpm_use_spi_mode = true;

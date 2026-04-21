@@ -30,6 +30,7 @@
             "displayName": "HSLink Lite XIP Release",
             "description": "Release build for HSLink Lite board with flash_xip",
             "inherits": "base",
+            "binaryDir": "${sourceDir}/build-hslinklite",
             "cacheVariables": {
                 "BOARD": "hslinklite"
             }
@@ -48,6 +49,7 @@
             "displayName": "HSLink Lite UF2 Release",
             "description": "Release build for HSLink Lite board with flash_uf2",
             "inherits": "base",
+            "binaryDir": "${sourceDir}/build-hslinklite",
             "cacheVariables": {
                 "BOARD": "hslinklite",
                 "HPM_BUILD_TYPE": "flash_uf2"
@@ -67,6 +69,7 @@
             "displayName": "HSLink Pro XIP Release",
             "description": "Release build for HSLink Pro board with flash_xip",
             "inherits": "base",
+            "binaryDir": "${sourceDir}/build-hslinkpro",
             "cacheVariables": {
                 "BOARD": "hslinkpro"
             }
@@ -85,6 +88,7 @@
             "displayName": "HSLink Pro UF2 Release",
             "description": "Release build for HSLink Pro board with flash_uf2",
             "inherits": "base",
+            "binaryDir": "${sourceDir}/build-hslinkpro",
             "cacheVariables": {
                 "BOARD": "hslinkpro",
                 "HPM_BUILD_TYPE": "flash_uf2"

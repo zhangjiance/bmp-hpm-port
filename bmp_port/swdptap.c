@@ -114,13 +114,88 @@ static void swd_gpio_pins_setup(void) {
   swd_current_mode = SWD_MODE_GPIO;
 }
 
+/* Dynamic clock selection algorithm from CherryDAP HSLink-Pro.
+ * Enumerate all available clock sources (clock_source_general_source_end),
+ * find the PLL/divider combination that produces frequency closest to target.
+ * 
+ * Parameters:
+ *   freq_hz: Target frequency in Hz
+ *   best_clk_src: Output - selected clock source
+ *   best_div: Output - selected divider (1-256)
+ * 
+ * Returns: Actual frequency achieved in Hz
+ */
+static uint32_t select_optimal_clock_config(uint32_t freq_hz, clk_src_t *best_clk_src, uint32_t *best_div) {
+  uint32_t freq_list[clock_source_general_source_end] = {0};
+  uint32_t pll_freq, div;
+  int min_diff_freq = INT32_MAX;
+  int current_diff_freq;
+  uint32_t best_freq = 0;
+  
+  /* Enumerate all general clock sources to build frequency list */
+  for (clock_source_t src = clock_source_osc0_clk0; src < clock_source_general_source_end; src++) {
+    /* Convert clock_source_t to clk_src_t (they have same enum values) */
+    clk_src_t clk_src = (clk_src_t)src;
+    
+    /* Probe PLL frequency by temporarily setting divider=1 */
+    clock_set_source_divider(SWD_SPI_BASE_CLOCK_NAME, clk_src, 1);
+    pll_freq = clock_get_frequency(SWD_SPI_BASE_CLOCK_NAME);
+    
+    if (pll_freq == 0)
+      continue; /* Skip disabled PLLs */
+    
+    /* Calculate divider needed to reach target frequency (range: 1-256) */
+    div = pll_freq / freq_hz;
+    if (div > 0 && div <= 256) {
+      freq_list[src] = pll_freq / div;
+    }
+  }
+  
+  /* Find the frequency with minimum error */
+  for (int i = 0; i < clock_source_general_source_end; i++) {
+    if (freq_list[i] == 0)
+      continue;
+    
+    current_diff_freq = (freq_list[i] > freq_hz) ? 
+                        (freq_list[i] - freq_hz) : (freq_hz - freq_list[i]);
+    
+    if (current_diff_freq < min_diff_freq) {
+      min_diff_freq = current_diff_freq;
+      best_freq = freq_list[i];
+    }
+  }
+  
+  /* Find which source produces the best frequency */
+  *best_clk_src = clk_src_pll0_clk2; /* Default fallback */
+  *best_div = 1;
+  
+  for (int i = 0; i < clock_source_general_source_end; i++) {
+    if (best_freq == freq_list[i]) {
+      *best_clk_src = (clk_src_t)i;
+      
+      /* Recalculate PLL frequency for this source */
+      clock_set_source_divider(SWD_SPI_BASE_CLOCK_NAME, *best_clk_src, 1);
+      pll_freq = clock_get_frequency(SWD_SPI_BASE_CLOCK_NAME);
+      *best_div = pll_freq / best_freq;
+      break;
+    }
+  }
+  
+  return best_freq;
+}
+
 static void swd_spi_init_with_freq(uint32_t freq_hz) {
   spi_timing_config_t timing_config = {0};
   spi_format_config_t format_config = {0};
   spi_control_config_t control_config = {0};
-
-  clock_set_source_divider(SWD_SPI_BASE_CLOCK_NAME, clk_src_pll1_clk0,
-                           10U); /* 80 MHz src */
+  clk_src_t best_clk_src;
+  uint32_t best_div;
+  
+  /* Use dynamic clock selection algorithm to find optimal configuration */
+  select_optimal_clock_config(freq_hz, &best_clk_src, &best_div);
+  
+  /* Apply the selected configuration */
+  clock_set_source_divider(SWD_SPI_BASE_CLOCK_NAME, best_clk_src, best_div);
   uint32_t spi_clock = clock_get_frequency(SWD_SPI_BASE_CLOCK_NAME);
 
   spi_master_get_default_timing_config(&timing_config);
@@ -289,10 +364,17 @@ static void swdptap_seq_out_parity_gpio(uint32_t tms_states,
                                         size_t clock_cycles)
     __attribute__((optimize(3)));
 
+/* Get actual delay cycles for current clock divider setting */
+static uint32_t swdptap_gpio_delay_cycles(void) {
+  return target_clk_divider == UINT32_MAX ? SWD_GPIO_NO_DELAY_CYCLES : target_clk_divider;
+}
+
 static void swdptap_turnaround(const swdio_status_t dir) {
   static swdio_status_t olddir = SWDIO_STATUS_FLOAT;
-  /* Reset state on mode switch - if this is first call after GPIO setup, force
-   * update */
+  /* 
+   * Reset state on mode switch - if this is first call after GPIO setup, force
+   * update 
+   */
   static swd_mode_t last_mode = SWD_MODE_NONE;
   if (last_mode != SWD_MODE_GPIO) {
     olddir = SWDIO_STATUS_DRIVE; /* GPIO mode starts with output */
@@ -313,67 +395,36 @@ static void swdptap_turnaround(const swdio_status_t dir) {
   }
 
   /* Turnaround clock cycle after direction change */
-  delay_clk_cycles(target_clk_divider + 1);
+  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
+  delay_clk_cycles(delay_cycles);
   PIN_SWCLK_TCK_SET();
-  delay_clk_cycles(target_clk_divider + 1);
+  delay_clk_cycles(delay_cycles);
   PIN_SWCLK_TCK_CLR();
 }
 
-static uint32_t swdptap_seq_in_clk_delay(size_t clock_cycles)
-    __attribute__((optimize(3)));
-static uint32_t swdptap_seq_in_no_delay(size_t clock_cycles)
-    __attribute__((optimize(3)));
-
-static uint32_t swdptap_seq_in_clk_delay(const size_t clock_cycles) {
+static uint32_t swdptap_seq_in_gpio(const size_t clock_cycles) {
   uint32_t value = 0;
-  if (!clock_cycles)
-    return 0;
-  for (size_t cycle = clock_cycles; cycle--;) {
-    /* Delay while CLK is low */
-    delay_clk_cycles(target_clk_divider);
-    /* Read bit before rising edge */
-    const bool bit = !!PIN_TMS_SWDIO_IN();
-    PIN_SWCLK_TCK_SET();
-    /* Delay while CLK is high (same as low for 50% duty cycle) */
-    delay_clk_cycles(target_clk_divider);
-    value >>= 1U;
-    value |= (uint32_t)bit << 31U;
-    PIN_SWCLK_TCK_CLR();
-  }
-  value >>= (32U - clock_cycles);
-  return value;
-}
-
-static uint32_t swdptap_seq_in_no_delay(const size_t clock_cycles) {
-  uint32_t value = 0;
-  if (!clock_cycles)
-    return 0;
-  for (size_t cycle = clock_cycles; cycle--;) {
-    const uint32_t bit = PIN_TMS_SWDIO_IN();
-    PIN_SWCLK_TCK_SET();
-    __asm volatile("nop" ::: "memory");
-    value >>= 1U;
-    value |= bit << 31U;
-    PIN_SWCLK_TCK_CLR();
-  }
-  value >>= (32U - clock_cycles);
-  return value;
-}
-
-static uint32_t swdptap_seq_in_gpio(size_t clock_cycles) {
+  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
   swdptap_turnaround(SWDIO_STATUS_FLOAT);
-  if (target_clk_divider != UINT32_MAX)
-    return swdptap_seq_in_clk_delay(clock_cycles);
-  else // NOLINT(readability-else-after-return)
-    return swdptap_seq_in_no_delay(clock_cycles);
+  if (!clock_cycles)
+    return 0;
+  for (size_t i = 0; i < clock_cycles; i++) {
+    delay_clk_cycles(delay_cycles);
+    PIN_SWCLK_TCK_SET();
+    value |= ((PIN_TMS_SWDIO_IN() & 1U) << i);
+    delay_clk_cycles(delay_cycles);
+    PIN_SWCLK_TCK_CLR();
+  }
+  return value;
 }
 
 static bool swdptap_seq_in_parity_gpio(uint32_t *ret, size_t clock_cycles) {
   const uint32_t result = swdptap_seq_in_gpio(clock_cycles);
-  delay_clk_cycles(target_clk_divider + 1);
+  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
+  delay_clk_cycles(delay_cycles);
   const uint32_t bit = PIN_TMS_SWDIO_IN();
   PIN_SWCLK_TCK_SET();
-  delay_clk_cycles(target_clk_divider + 1);
+  delay_clk_cycles(delay_cycles);
   PIN_SWCLK_TCK_CLR();
   swdptap_turnaround(SWDIO_STATUS_DRIVE);
   *ret = result;
@@ -381,58 +432,32 @@ static bool swdptap_seq_in_parity_gpio(uint32_t *ret, size_t clock_cycles) {
   return parity == (bool)bit;
 }
 
-static void swdptap_seq_out_clk_delay(uint32_t tms_states, size_t clock_cycles)
-    __attribute__((optimize(3)));
-static void swdptap_seq_out_no_delay(uint32_t tms_states, size_t clock_cycles)
-    __attribute__((optimize(3)));
-
-static void swdptap_seq_out_clk_delay(const uint32_t tms_states,
-                                      const size_t clock_cycles) {
-  uint32_t value = tms_states;
-  if (!clock_cycles)
-    return;
-  for (size_t cycle = clock_cycles; cycle--;) {
-    PIN_TMS_SWDIO_OUT(value & 1U);
-    delay_clk_cycles(target_clk_divider);
-    PIN_SWCLK_TCK_SET();
-    delay_clk_cycles(target_clk_divider);
-    value >>= 1U;
-    PIN_SWCLK_TCK_CLR();
-  }
-}
-
-static void swdptap_seq_out_no_delay(const uint32_t tms_states,
-                                     const size_t clock_cycles) {
-  uint32_t value = tms_states;
-  if (!clock_cycles)
-    return;
-  for (size_t cycle = clock_cycles; cycle--;) {
-    PIN_SWCLK_TCK_CLR();
-    PIN_TMS_SWDIO_OUT(value & 1U);
-    PIN_SWCLK_TCK_SET();
-    __asm volatile("nop" ::: "memory");
-    value >>= 1U;
-  }
-  PIN_SWCLK_TCK_CLR();
-}
-
 static void swdptap_seq_out_gpio(const uint32_t tms_states,
                                  const size_t clock_cycles) {
+  uint32_t value = tms_states;
+  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
   swdptap_turnaround(SWDIO_STATUS_DRIVE);
-  if (target_clk_divider != UINT32_MAX)
-    swdptap_seq_out_clk_delay(tms_states, clock_cycles);
-  else
-    swdptap_seq_out_no_delay(tms_states, clock_cycles);
+  if (!clock_cycles)
+    return;
+  for (size_t cycle = clock_cycles; cycle--;) {
+    PIN_TMS_SWDIO_OUT(value & 1U);
+    delay_clk_cycles(delay_cycles);
+    PIN_SWCLK_TCK_SET();
+    delay_clk_cycles(delay_cycles);
+    value >>= 1U;
+    PIN_SWCLK_TCK_CLR();
+  }
 }
 
 static void swdptap_seq_out_parity_gpio(const uint32_t tms_states,
                                         const size_t clock_cycles) {
   const bool parity = calculate_odd_parity(tms_states);
+  const uint32_t delay_cycles = swdptap_gpio_delay_cycles();
   swdptap_seq_out_gpio(tms_states, clock_cycles);
   PIN_TMS_SWDIO_OUT(parity);
-  delay_clk_cycles(target_clk_divider + 1);
+  delay_clk_cycles(delay_cycles);
   PIN_SWCLK_TCK_SET();
-  delay_clk_cycles(target_clk_divider + 1);
+  delay_clk_cycles(delay_cycles);
   PIN_SWCLK_TCK_CLR();
 }
 
