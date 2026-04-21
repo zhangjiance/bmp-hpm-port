@@ -40,54 +40,54 @@ void init_py_pins_as_pgpio(void)
 void init_gpio_swj_pins(void)
 {
     HPM_IOC->PAD[TCK_SPI2_CLK].FUNC_CTL = IOC_PB11_FUNC_CTL_GPIO_B_11;
-    HPM_IOC->PAD[TCK_SPI2_CLK].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[TCK_SPI2_CLK].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 11, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 11);
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOB, 11, 1);
 
     HPM_IOC->PAD[TDO_SPI2_MISO].FUNC_CTL = IOC_PB12_FUNC_CTL_GPIO_B_12;
-    HPM_IOC->PAD[TDO_SPI2_MISO].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[TDO_SPI2_MISO].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 12, gpiom_core0_fast);
     gpio_set_pin_input(HPM_FGPIO, GPIO_OE_GPIOB, 12);
 
     HPM_IOC->PAD[TDI_SPI2_MOSI].FUNC_CTL = IOC_PB13_FUNC_CTL_GPIO_B_13;
-    HPM_IOC->PAD[TDI_SPI2_MOSI].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[TDI_SPI2_MOSI].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 13, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 13);
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOB, 13, 1);
 
     HPM_IOC->PAD[TRST].FUNC_CTL = IOC_PB14_FUNC_CTL_GPIO_B_14;
-    HPM_IOC->PAD[TRST].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[TRST].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 14, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 14);
     gpio_write_pin(HPM_FGPIO, GPIO_OE_GPIOB, 14, 1);
 
     HPM_IOC->PAD[SRST].FUNC_CTL = IOC_PB15_FUNC_CTL_GPIO_B_15;
-    HPM_IOC->PAD[SRST].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[SRST].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOB, 15, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOB, 15);
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOB, 15, 1);
 
     HPM_IOC->PAD[TMS_O_SPI1_MOSI].FUNC_CTL = IOC_PA29_FUNC_CTL_GPIO_A_29;
-    HPM_IOC->PAD[TMS_O_SPI1_MOSI].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[TMS_O_SPI1_MOSI].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 29, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOA, 29);
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOA, 29, 0);
 
     HPM_IOC->PAD[TMS_I_SPI1_MISO].FUNC_CTL = IOC_PA28_FUNC_CTL_GPIO_A_28;
-    HPM_IOC->PAD[TMS_I_SPI1_MISO].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[TMS_I_SPI1_MISO].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 28, gpiom_core0_fast);
     gpio_set_pin_input(HPM_FGPIO, GPIO_OE_GPIOA, 28);
 
     HPM_IOC->PAD[SWD_DIO_DIR].FUNC_CTL = IOC_PA30_FUNC_CTL_GPIO_A_30;
-    HPM_IOC->PAD[SWD_DIO_DIR].PAD_CTL =  IOC_PAD_PAD_CTL_SR_SET(1)|IOC_PAD_PAD_CTL_SPD_SET(3);
+    HPM_IOC->PAD[SWD_DIO_DIR].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 
     gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 30, gpiom_core0_fast);
     gpio_set_pin_output(HPM_FGPIO, GPIO_OE_GPIOA, 30);
@@ -294,4 +294,17 @@ void init_gptmr_channel_pin(GPTMR_Type *ptr, uint32_t channel, bool as_comp)
 /* Called in SWD mode to disable TDI pin - no-op when using SPI1 for SWD */
 void uninit_jtag_tdi_pin(void) {
     /* PB13 (TDI/SPI2_MOSI) not used in SWD SPI1 mode; leave as-is */
+}
+
+/* Disable UART2 pins (PA08/PA09) - configure as floating GPIO input */
+void uninit_uart2_pins(void) {
+    /* Configure PA08 (UART2_TXD) as floating GPIO input */
+    HPM_IOC->PAD[IOC_PAD_PA08].FUNC_CTL = IOC_PA08_FUNC_CTL_GPIO_A_08;
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 8, gpiom_soc_gpio0);
+    gpio_set_pin_input(HPM_GPIO0, GPIO_OE_GPIOA, 8);
+    
+    /* Configure PA09 (UART2_RXD) as floating GPIO input */
+    HPM_IOC->PAD[IOC_PAD_PA09].FUNC_CTL = IOC_PA09_FUNC_CTL_GPIO_A_09;
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 9, gpiom_soc_gpio0);
+    gpio_set_pin_input(HPM_GPIO0, GPIO_OE_GPIOA, 9);
 }

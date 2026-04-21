@@ -50,9 +50,11 @@ HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL =
 IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3) |
 IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0);
 HPM_IOC->PAD[IOC_PAD_PA29].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-/* PB11 (same SWDCLK net) also drives SPI2 SCLK */
-HPM_IOC->PAD[IOC_PAD_PB11].FUNC_CTL =
-IOC_PB11_FUNC_CTL_SPI2_SCLK | IOC_PAD_FUNC_CTL_LOOP_BACK_SET(1);
+/* PB11 (SWCLK output to target) - Set as GPIO input (high-Z), driven by PA27 on PCB
+ * Only configure PAD_CTL for drive strength, FUNC_CTL stays as GPIO from initialization
+ * GPIO port B=1, pin 11 */
+HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
+gpio_set_pin_input(PIN_GPIO, 1, 11);  /* Port B=1, Pin 11 */
 }
 
 static void swd_gpio_pins_setup(void)
@@ -62,13 +64,14 @@ HPM_IOC->PAD[IOC_PAD_PA27].FUNC_CTL = IOC_PA27_FUNC_CTL_GPIO_A_27;
 HPM_IOC->PAD[IOC_PAD_PA28].FUNC_CTL = IOC_PA28_FUNC_CTL_GPIO_A_28;
 HPM_IOC->PAD[IOC_PAD_PA29].FUNC_CTL = IOC_PA29_FUNC_CTL_GPIO_A_29;
 HPM_IOC->PAD[IOC_PAD_PB11].FUNC_CTL = IOC_PB11_FUNC_CTL_GPIO_B_11;
-HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1) | IOC_PAD_PAD_CTL_SPD_SET(3);
+HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
 HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL =
-IOC_PAD_PAD_CTL_SR_SET(1) | IOC_PAD_PAD_CTL_SPD_SET(3) |
+IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3) |
 IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0);
-HPM_IOC->PAD[IOC_PAD_PA29].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1) | IOC_PAD_PAD_CTL_SPD_SET(3);
-HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL = IOC_PAD_PAD_CTL_SR_SET(1) | IOC_PAD_PAD_CTL_SPD_SET(3);
-/* Restore GPIO directions */
+HPM_IOC->PAD[IOC_PAD_PA29].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
+HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
+/* Restore GPIO directions: PA27 (TCK) and PA29 (TMS/SWDIO) as outputs
+ * Note: In GPIO mode, PA27 is used, not PB11 */
 gpio_set_pin_output(PIN_GPIO, TCK_PORT_IDX, TCK_PIN_IDX);
 gpio_set_pin_output(PIN_GPIO, TMS_PORT_IDX, TMS_PIN_IDX);
 }
@@ -109,8 +112,8 @@ control_config.common_config.data_phase_fmt    = spi_single_io_mode;
 control_config.common_config.dummy_cnt         = spi_dummy_count_1;
 spi_control_init(SWD_SPI_BASE, &control_config, 1, 1);
 
-/* Default: SWDIO driven (output, DIR=1) */
-PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
+/* Default: SWDIO as input (DIR=0), matching CherryDAP */
+PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].CLEAR = SWDIO_DIR_PIN_MASK;
 }
 
 static inline void swd_spi_reset(void)
@@ -125,6 +128,7 @@ static void swd_spi_write_bits(uint32_t data, uint16_t nbits)
 if (!nbits)
 return;
 swd_spi_reset();
+/* Set SWDIO_DIR=1 for output, matching CherryDAP */
 PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
 SWD_SPI_BASE->TRANSCTRL = (SWD_SPI_BASE->TRANSCTRL &
 ~(SPI_TRANSCTRL_TRANSMODE_MASK | SPI_TRANSCTRL_WRTRANCNT_MASK)) |
@@ -142,6 +146,7 @@ static uint32_t swd_spi_read_bits(uint16_t nbits)
 if (!nbits)
 return 0;
 swd_spi_reset();
+/* Set SWDIO_DIR=0 for input, matching CherryDAP */
 PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].CLEAR = SWDIO_DIR_PIN_MASK;
 SWD_SPI_BASE->TRANSCTRL = (SWD_SPI_BASE->TRANSCTRL &
 ~(SPI_TRANSCTRL_TRANSMODE_MASK | SPI_TRANSCTRL_RDTRANCNT_MASK)) |
@@ -177,7 +182,7 @@ static bool swdptap_seq_in_parity_spi(uint32_t *ret, size_t clock_cycles)
 {
 uint32_t result    = swdptap_seq_in_spi(clock_cycles);
 uint32_t parity_bit = swd_spi_read_bits(1) & 1U;
-PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
+/* Keep SWDIO_DIR=0 after read, matching CherryDAP */
 *ret = result;
 return calculate_odd_parity(result) == (bool)parity_bit;
 }
