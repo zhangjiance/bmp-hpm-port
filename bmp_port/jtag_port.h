@@ -86,7 +86,7 @@
 #define PAD_CTL_FAST_PULLDOWN   (PAD_CTL_FAST | IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0))
 
 /* GPIO fallback delay when no explicit divider is configured (for both SWD and JTAG). */
-#define SWD_GPIO_NO_DELAY_CYCLES  0U
+#define SWD_GPIO_NO_DELAY_CYCLES  1U
 
 /* Delay for clock cycle timing - RISC-V assembly optimized
  * Uses only 2 instructions per iteration: addi + bnez
