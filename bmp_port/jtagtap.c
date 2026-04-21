@@ -43,16 +43,27 @@ jtag_proc_s jtag_proc;
 
 static void jtag_spi_pins_setup(void) {
   clock_add_to_group(JTAG_SPI_BASE_CLOCK_NAME, 0);
+  /* Configure SPI2 pins: PB11=SCLK, PB12=MISO/TDO, PB13=MOSI/TDI */
   HPM_IOC->PAD[IOC_PAD_PB11].FUNC_CTL =
       IOC_PB11_FUNC_CTL_SPI2_SCLK | IOC_PAD_FUNC_CTL_LOOP_BACK_SET(1);
   HPM_IOC->PAD[IOC_PAD_PB12].FUNC_CTL = IOC_PB12_FUNC_CTL_SPI2_MISO;
   HPM_IOC->PAD[IOC_PAD_PB13].FUNC_CTL = IOC_PB13_FUNC_CTL_SPI2_MOSI;
-  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  HPM_IOC->PAD[IOC_PAD_PB12].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  HPM_IOC->PAD[IOC_PAD_PB13].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
+  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PB12].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PB13].PAD_CTL = PAD_CTL_FAST;
+  
+  /* Hardware conflict prevention:
+   * PA27 (SPI1_SCLK) ←→ PB11 (SPI2_SCLK/GPIO) are connected on PCB
+   * PA28 (SPI1_MISO) ←→ PA29 (SPI1_MOSI/TMS) are connected on PCB
+   * Set PA27/PA28 as GPIO input (high-Z) to avoid conflicts with PB11/PB12 */
+  HPM_IOC->PAD[IOC_PAD_PA27].FUNC_CTL = IOC_PA27_FUNC_CTL_GPIO_A_27;
+  HPM_IOC->PAD[IOC_PAD_PA28].FUNC_CTL = IOC_PA28_FUNC_CTL_GPIO_A_28;
+  HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL = PAD_CTL_FAST;
+  gpio_set_pin_input(PIN_GPIO, GPIO_GET_PORT_INDEX(IOC_PAD_PA27),
+                     GPIO_GET_PIN_INDEX(IOC_PAD_PA27));
+  gpio_set_pin_input(PIN_GPIO, GPIO_GET_PORT_INDEX(IOC_PAD_PA28),
+                     GPIO_GET_PIN_INDEX(IOC_PAD_PA28));
 }
 
 static void jtag_gpio_pins_setup(void) {
@@ -60,13 +71,24 @@ static void jtag_gpio_pins_setup(void) {
   HPM_IOC->PAD[IOC_PAD_PB11].FUNC_CTL = IOC_PB11_FUNC_CTL_GPIO_B_11;
   HPM_IOC->PAD[IOC_PAD_PB12].FUNC_CTL = IOC_PB12_FUNC_CTL_GPIO_B_12;
   HPM_IOC->PAD[IOC_PAD_PB13].FUNC_CTL = IOC_PB13_FUNC_CTL_GPIO_B_13;
-  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  HPM_IOC->PAD[IOC_PAD_PB12].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  HPM_IOC->PAD[IOC_PAD_PB13].PAD_CTL =
-      IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-  /* Restore GPIO directions */
+  HPM_IOC->PAD[IOC_PAD_PB11].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PB12].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PB13].PAD_CTL = PAD_CTL_FAST;
+  
+  /* Hardware conflict prevention:
+   * PA27 (SPI1_SCLK) ←→ PB11 (GPIO TCK) are connected on PCB
+   * PA28 (SPI1_MISO) ←→ PA29 (GPIO TMS) are connected on PCB
+   * Set PA27/PA28 as GPIO input (high-Z) to avoid conflicts with PB11/PB13 */
+  HPM_IOC->PAD[IOC_PAD_PA27].FUNC_CTL = IOC_PA27_FUNC_CTL_GPIO_A_27;
+  HPM_IOC->PAD[IOC_PAD_PA28].FUNC_CTL = IOC_PA28_FUNC_CTL_GPIO_A_28;
+  HPM_IOC->PAD[IOC_PAD_PA27].PAD_CTL = PAD_CTL_FAST;
+  HPM_IOC->PAD[IOC_PAD_PA28].PAD_CTL = PAD_CTL_FAST;
+  gpio_set_pin_input(PIN_GPIO, GPIO_GET_PORT_INDEX(IOC_PAD_PA27),
+                     GPIO_GET_PIN_INDEX(IOC_PAD_PA27));
+  gpio_set_pin_input(PIN_GPIO, GPIO_GET_PORT_INDEX(IOC_PAD_PA28),
+                     GPIO_GET_PIN_INDEX(IOC_PAD_PA28));
+  
+  /* Restore GPIO directions for JTAG */
   gpio_set_pin_output(PIN_GPIO, TCK_PORT_IDX, TCK_PIN_IDX);
   gpio_set_pin_input(PIN_GPIO, TDO_PORT_IDX, TDO_PIN_IDX);
   gpio_set_pin_output(PIN_GPIO, TDI_PORT_IDX, TDI_PIN_IDX);
@@ -278,12 +300,10 @@ static void jtagtap_tms_seq_clk_delay(uint32_t tms_states,
     const bool state = tms_states & 1U;
     PIN_TMS_SWDIO_OUT(state);
     PIN_SWCLK_TCK_SET();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
     tms_states >>= 1U;
     PIN_SWCLK_TCK_CLR();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
   }
 }
 
@@ -308,8 +328,7 @@ static void jtagtap_tdi_tdo_seq_clk_delay(const uint8_t *const data_in,
     PIN_TMS_SWDIO_OUT(cycle + 1U >= clock_cycles && final_tms);
     PIN_TDI_OUT(data_in[byte] & (1U << bit));
     PIN_SWCLK_TCK_SET();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
     if (PIN_TDO_IN())
       value |= 1U << bit;
     if (bit == 7U) {
@@ -317,8 +336,7 @@ static void jtagtap_tdi_tdo_seq_clk_delay(const uint8_t *const data_in,
       value = 0;
     }
     PIN_SWCLK_TCK_CLR();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
   }
   if (clock_cycles & 7U)
     data_out[(clock_cycles - 1U) >> 3U] = value;
@@ -359,11 +377,9 @@ static void jtagtap_tdi_seq_clk_delay(const uint8_t *const data_in,
     PIN_TMS_SWDIO_OUT(cycle + 1U >= clock_cycles && final_tms);
     PIN_TDI_OUT(data_in[byte] & (1U << bit));
     PIN_SWCLK_TCK_SET();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
     PIN_SWCLK_TCK_CLR();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
   }
 }
 
@@ -387,11 +403,9 @@ static void jtagtap_tdi_seq_no_delay(const uint8_t *const data_in,
 static void jtagtap_cycle_clk_delay(const size_t clock_cycles) {
   for (size_t cycle = 0; cycle < clock_cycles; ++cycle) {
     PIN_SWCLK_TCK_SET();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
     PIN_SWCLK_TCK_CLR();
-    for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-      continue;
+    delay_clk_cycles(target_clk_divider);
   }
 }
 
@@ -420,12 +434,10 @@ static bool jtagtap_next_no_delay(void) __attribute__((optimize(3)));
 
 static bool jtagtap_next_clk_delay(void) {
   PIN_SWCLK_TCK_SET();
-  for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider);
   const uint16_t result = (uint16_t)PIN_TDO_IN();
   PIN_SWCLK_TCK_CLR();
-  for (volatile uint32_t counter = target_clk_divider; counter > 0; --counter)
-    continue;
+  delay_clk_cycles(target_clk_divider);
   return result != 0;
 }
 
@@ -523,8 +535,8 @@ static void jtagtap_cycle(const bool tms, const bool tdi,
  * ================================================================= */
 
 void hpm_jtag_setup_mode(void) {
-  /* TMS/TRST/SRST always GPIO; SWDIO_DIR=1 in JTAG */
-  PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
+  /* TMS/TRST/SRST always GPIO; SWDIO_DIR=1 in JTAG mode (output to target) */
+  PIN_SWDIO_DIR_SET();
 
   if (hpm_use_spi_mode) {
     jtag_spi_pins_setup();
@@ -549,8 +561,7 @@ void hpm_jtag_setup_mode(void) {
 static void jtagtap_reset(void) {
 #ifdef PIN_JTAG_TRST
   PIN_nTRST_CLR();
-  for (volatile size_t i = 0; i < 10000U; i++)
-    continue;
+  delay_clk_cycles(10000);
   PIN_nTRST_SET();
 #endif
   jtagtap_soft_reset();
