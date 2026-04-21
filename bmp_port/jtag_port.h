@@ -96,7 +96,9 @@ __STATIC_FORCEINLINE void PIN_SWCLK_TCK_CLR(void)
 
 __STATIC_FORCEINLINE uint32_t PIN_TMS_SWDIO_IN(void)
 {
-    return (PIN_GPIO->DI[TMS_PORT_IDX].VALUE >> TMS_PIN_IDX) & 1U;
+    uint32_t value = (PIN_GPIO->DI[TMS_PORT_IDX].VALUE >> TMS_PIN_IDX) & 1U;
+    __asm volatile("fence io, io");
+    return value;
 }
 
 __STATIC_FORCEINLINE void PIN_TMS_SWDIO_OUT(uint32_t bit)
@@ -122,27 +124,39 @@ __STATIC_FORCEINLINE void PIN_TMS_SWDIO_CLR(void)
     __asm volatile("fence io, io");
 }
 
-__STATIC_FORCEINLINE void PIN_TMS_SWDIO_SET_OUT(void)
+/* SWDIO_DIR control - only GPIO register access, no PAD reconfiguration */
+__STATIC_FORCEINLINE void PIN_SWDIO_DIR_SET(void)
 {
     PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
-    HPM_IOC->PAD[PIN_TMS].FUNC_CTL = IOC_PAD_FUNC_CTL_ALT_SELECT_SET(0); /* as gpio*/
-    HPM_IOC->PAD[PIN_TMS].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3) | IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0);
+    __asm volatile("fence io, io");
+}
+
+__STATIC_FORCEINLINE void PIN_SWDIO_DIR_CLR(void)
+{
+    PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].CLEAR = SWDIO_DIR_PIN_MASK;
+    __asm volatile("fence io, io");
+}
+
+__STATIC_FORCEINLINE void PIN_TMS_SWDIO_SET_OUT(void)
+{
+    /* Host will drive SWDIO: set DIR=1 first, then MCU GPIO as output */
+    PIN_SWDIO_DIR_SET();
     gpio_set_pin_output(PIN_GPIO, GPIO_GET_PORT_INDEX(PIN_TMS), GPIO_GET_PIN_INDEX(PIN_TMS));
     __asm volatile("fence io, io");
 }
 
 __STATIC_FORCEINLINE void PIN_TMS_SWDIO_SET_IN(void)
 {
-    PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].CLEAR = SWDIO_DIR_PIN_MASK;
-    HPM_IOC->PAD[PIN_TMS].PAD_CTL = IOC_PAD_PAD_CTL_SR_MASK | IOC_PAD_PAD_CTL_SPD_SET(3);
-    HPM_IOC->PAD[PIN_TMS].FUNC_CTL = IOC_PAD_FUNC_CTL_ALT_SELECT_SET(0);
+    /* Target will drive SWDIO: set MCU GPIO as input first, then DIR=0 */
     gpio_set_pin_input(PIN_GPIO, GPIO_GET_PORT_INDEX(PIN_TMS), GPIO_GET_PIN_INDEX(PIN_TMS));
-    __asm volatile("fence io, io");
+    PIN_SWDIO_DIR_CLR();
 }
 
 __STATIC_FORCEINLINE uint32_t PIN_TDI_IN(void)
 {
-    return (PIN_GPIO->DI[TDI_PORT_IDX].VALUE >> TDI_PIN_IDX) & 1U;
+    uint32_t value = (PIN_GPIO->DI[TDI_PORT_IDX].VALUE >> TDI_PIN_IDX) & 1U;
+    __asm volatile("fence io, io");
+    return value;
 }
 
 __STATIC_FORCEINLINE void PIN_TDI_OUT(uint32_t bit)
@@ -170,7 +184,9 @@ __STATIC_FORCEINLINE void PIN_TDI_CLR(void)
 
 __STATIC_FORCEINLINE uint32_t PIN_TDO_IN(void)
 {
-    return (PIN_GPIO->DI[TDO_PORT_IDX].VALUE >> TDO_PIN_IDX) & 1U;
+    uint32_t value = (PIN_GPIO->DI[TDO_PORT_IDX].VALUE >> TDO_PIN_IDX) & 1U;
+    __asm volatile("fence io, io");
+    return value;
 }
 
 __STATIC_FORCEINLINE uint32_t PIN_nTRST_IN(void)
