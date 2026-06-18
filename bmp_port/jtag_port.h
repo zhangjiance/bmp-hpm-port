@@ -117,51 +117,41 @@ __STATIC_FORCEINLINE uint32_t platform_gpio_delay_cycles(void)
 __STATIC_FORCEINLINE void PIN_SWCLK_TCK_SET(void)
 {
     PIN_GPIO->DO[TCK_PORT_IDX].SET = TCK_PIN_MASK;
-    __asm volatile("fence io, io");
 }
 
 __STATIC_FORCEINLINE void PIN_SWCLK_TCK_CLR(void)
 {
     PIN_GPIO->DO[TCK_PORT_IDX].CLEAR = TCK_PIN_MASK;
-    __asm volatile("fence io, io");
 }
 
 
 __STATIC_FORCEINLINE uint32_t PIN_TMS_SWDIO_IN(void)
 {
-    uint32_t value = (PIN_GPIO->DI[TMS_PORT_IDX].VALUE >> TMS_PIN_IDX) & 1U;
     __asm volatile("fence io, io");
+    uint32_t value = (PIN_GPIO->DI[TMS_PORT_IDX].VALUE >> TMS_PIN_IDX) & 1U;
     return value;
 }
 
 __STATIC_FORCEINLINE void PIN_TMS_SWDIO_OUT(uint32_t bit)
 {
-    if (bit) {
-        PIN_GPIO->DO[TMS_PORT_IDX].SET = TMS_PIN_MASK;
-    } else {
-        PIN_GPIO->DO[TMS_PORT_IDX].CLEAR = TMS_PIN_MASK;
-    }
-    __asm volatile("fence io, io");
+    *(&PIN_GPIO->DO[TMS_PORT_IDX].SET + (bit ^ 1)) = TMS_PIN_MASK;
 }
 
 /* Optimized versions for constant values - no branch overhead */
 __STATIC_FORCEINLINE void PIN_TMS_SWDIO_SET(void)
 {
     PIN_GPIO->DO[TMS_PORT_IDX].SET = TMS_PIN_MASK;
-    __asm volatile("fence io, io");
 }
 
 __STATIC_FORCEINLINE void PIN_TMS_SWDIO_CLR(void)
 {
     PIN_GPIO->DO[TMS_PORT_IDX].CLEAR = TMS_PIN_MASK;
-    __asm volatile("fence io, io");
 }
 
 /* SWDIO_DIR control - only GPIO register access, no PAD reconfiguration */
 __STATIC_FORCEINLINE void PIN_SWDIO_DIR_SET(void)
 {
     PIN_GPIO->DO[SWDIO_DIR_PORT_IDX].SET = SWDIO_DIR_PIN_MASK;
-    __asm volatile("fence io, io");
 }
 
 __STATIC_FORCEINLINE void PIN_SWDIO_DIR_CLR(void)
@@ -194,11 +184,7 @@ __STATIC_FORCEINLINE uint32_t PIN_TDI_IN(void)
 
 __STATIC_FORCEINLINE void PIN_TDI_OUT(uint32_t bit)
 {
-    if (bit) {
-        PIN_GPIO->DO[TDI_PORT_IDX].SET = TDI_PIN_MASK;
-    } else {
-        PIN_GPIO->DO[TDI_PORT_IDX].CLEAR = TDI_PIN_MASK;
-    }
+    *(&PIN_GPIO->DO[TDI_PORT_IDX].SET + (bit ^ 1)) = TDI_PIN_MASK;
     __asm volatile("fence io, io");
 }
 
@@ -229,11 +215,7 @@ __STATIC_FORCEINLINE uint32_t PIN_nTRST_IN(void)
 
 __STATIC_FORCEINLINE void PIN_nTRST_OUT(uint32_t bit)
 {
-    if (bit) {
-        PIN_GPIO->DO[TRST_PORT_IDX].SET = TRST_PIN_MASK;
-    } else {
-        PIN_GPIO->DO[TRST_PORT_IDX].CLEAR = TRST_PIN_MASK;
-    }
+    *(&PIN_GPIO->DO[TRST_PORT_IDX].SET + (bit ^ 1)) = TRST_PIN_MASK;
     __asm volatile("fence io, io");
 }
 

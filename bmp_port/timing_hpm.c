@@ -29,7 +29,7 @@
 uint32_t target_clk_divider = UINT32_MAX ;
 
 /* Global mode flag and SPI frequency */
-bool     hpm_use_spi_mode = true;
+bool     hpm_use_spi_mode = false;
 uint32_t hpm_spi_freq_hz  = HPM_SPI_FREQ_DEFAULT_HZ;
 
 /*

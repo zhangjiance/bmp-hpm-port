@@ -77,5 +77,5 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 # Generate IDE projects and ensure HTML header is generated before compilation
-generate_ide_projects()
+# generate_ide_projects()
 add_dependencies(app generate_webdfu_header)
