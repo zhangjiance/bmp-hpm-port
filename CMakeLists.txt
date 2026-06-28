@@ -8,22 +8,16 @@ set(RV_ARCH "rv32imac_zicsr_zifencei")
 set(APP_NAME "bmp-hpm-port")
 
 
-if(HPM_BUILD_TYPE STREQUAL "flash_uf2")
 set(CUSTOM_GCC_LINKER_FILE
-        ${CMAKE_CURRENT_SOURCE_DIR}/linkfile/flash_uf2.ld
+        ${CMAKE_CURRENT_SOURCE_DIR}/linkfile/flash_dfu.ld
 )
-else()
-set(CUSTOM_GCC_LINKER_FILE
-        ${CMAKE_CURRENT_SOURCE_DIR}/linkfile/flash_xip.ld
-)
-endif()
 
 set(CONFIG_SEGGER_RTT 1)
 set(CONFIG_CHERRYRB 1)
 set(CONFIG_CHERRYUSB 1)
 set(CONFIG_USB_DEVICE 1)
 set(CONFIG_USB_DEVICE_CDC_ACM 1)
-set(BOARD_SEARCH_PATH ${CMAKE_CURRENT_SOURCE_DIR}/board)
+set(BOARD_SEARCH_PATH ${CMAKE_CURRENT_SOURCE_DIR}/boards)
 
 find_package(hpm-sdk REQUIRED HINTS $ENV{HPM_SDK_BASE})
 project(cherrybmp)
@@ -40,11 +34,3 @@ sdk_compile_definitions(-DDISABLE_IRQ_PREEMPTIVE=1)
 sdk_app_src(main.c)
 
 # generate_ide_projects()
-
-if(HPM_BUILD_TYPE STREQUAL "flash_uf2")
-add_custom_command(
-        TARGET ${APP_ELF_NAME} POST_BUILD
-        COMMAND ${python_exec} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/uf2conv.py -f 0x0A4D5048 -b 0x80020000 -c ${CMAKE_BINARY_DIR}/output/${APP_BIN_NAME} -o ${CMAKE_BINARY_DIR}/output/${APP_NAME}.uf2
-        COMMENT "Convert to UF2"
-)
-endif()

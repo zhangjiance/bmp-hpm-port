@@ -6,39 +6,26 @@
 ENTRY(_start)
 
 STACK_SIZE = _stack_size;
-HEAP_SIZE = _heap_size;
+BL_SIZE = 64 * 1024;
+BL_B_SLOT_SIZE = 128 * 1024;
+E2P_EM_SIZE = 128 * 1024;
 
 MEMORY
 {
-    XPI0 (rx) : ORIGIN = 0x80000000, LENGTH = _flash_size
+    XPI0 (rx) : ORIGIN = 0x80000000 + BL_SIZE, LENGTH = _flash_size - BL_SIZE - BL_B_SLOT_SIZE - E2P_EM_SIZE
     ILM (wx) : ORIGIN = 0x00000000, LENGTH = 128K
     DLM (w) : ORIGIN = 0x00080300, LENGTH = 128K - 768
-    AHB_SRAM (w) : ORIGIN = 0xf0400000, LENGTH = 32K
+    AHB_SRAM (w) : ORIGIN = 0xF0400000, LENGTH = 32k
 }
 
-__nor_cfg_option_load_addr__ = ORIGIN(XPI0) + 0x400;
-__boot_header_load_addr__ = ORIGIN(XPI0) + 0x1000;
-__app_load_addr__ = ORIGIN(XPI0) + 0x3000;
-__boot_header_length__ = __boot_header_end__ - __boot_header_start__;
-__app_offset__ = __app_load_addr__ - __boot_header_load_addr__;
+/* 预留512字节的空间到AHB_SRAM给bootloader做配置 */
+__bootloader_reserved_length__ = 512;
 
 SECTIONS
 {
-    .nor_cfg_option __nor_cfg_option_load_addr__ : {
-        KEEP(*(.nor_cfg_option))
-    } > XPI0
-
-    .boot_header __boot_header_load_addr__ : {
-        __boot_header_start__ = .;
-        KEEP(*(.boot_header))
-        KEEP(*(.fw_info_table))
-        KEEP(*(.dc_info))
-        __boot_header_end__ = .;
-    } > XPI0
-
-    .start __app_load_addr__ : {
-        . = ALIGN(8);
+    .start : {
         KEEP(*(.start))
+        . = ALIGN(8);
     } > XPI0
 
     __vector_load_addr__ = ADDR(.start) + SIZEOF(.start);
@@ -55,7 +42,7 @@ SECTIONS
         __vector_ram_end__ = .;
     } > ILM
 
-    .text (__vector_load_addr__ + SIZEOF(.vectors)) : {
+    .text (__vector_load_addr__ + SIZEOF(.vectors)): {
         . = ALIGN(8);
         *(.text)
         *(.text*)
@@ -119,6 +106,7 @@ SECTIONS
     }  > XPI0
     __eh_frame_hdr_start = SIZEOF(.eh_frame_hdr) > 0 ? ADDR(.eh_frame_hdr) : 0;
     __eh_frame_hdr_end = SIZEOF(.eh_frame_hdr) > 0 ? . : 0;
+
 
     .rel : {
         KEEP(*(.rel*))
@@ -190,6 +178,9 @@ SECTIONS
         PROVIDE(__ramfunc_end__ = .);
     } > ILM
 
+    PROVIDE(__heap_start__ = .);
+    __heap_end__ = ORIGIN(ILM) + LENGTH(ILM);
+
     __tdata_load_addr__ = etext + SIZEOF(.data) + SIZEOF(.fast);
     .tdata : AT(__tdata_load_addr__) {
         . = ALIGN(8);
@@ -233,6 +224,18 @@ SECTIONS
         . = ALIGN(8);
     } > DLM
 
+    __boot_header_load_addr__ = ORIGIN(AHB_SRAM) + LENGTH(AHB_SRAM) - __bootloader_reserved_length__;
+    .bl_setting (NOLOAD) : AT(__boot_header_load_addr__) {
+        KEEP(*(.bl_setting))
+    } > AHB_SRAM
+
+    ASSERT(SIZEOF(.bl_setting) <= __bootloader_reserved_length__, "******  FAILED! .bl_setting too many!!   ******")
+
+    .ahb_sram (NOLOAD) : {
+        KEEP(*(.ahb_sram))
+        KEEP(*(.ahb_sram.*))
+    } > AHB_SRAM
+
     .bss (NOLOAD) : {
         . = ALIGN(8);
         __bss_start__ = .;
@@ -254,6 +257,7 @@ SECTIONS
         KEEP(*(.framebuffer.*))
         . = ALIGN(8);
     } > DLM
+
 
     .noncacheable (NOLOAD) : {
         . = ALIGN(8);
@@ -279,13 +283,6 @@ SECTIONS
         . = ALIGN(8);
     } > DLM
 
-    .heap (NOLOAD) : {
-        . = ALIGN(8);
-        __heap_start__ = .;
-        . += HEAP_SIZE;
-        __heap_end__ = .;
-    } > DLM
-
     .stack (NOLOAD) : {
         . = ALIGN(16);
         __stack_base__ = .;
@@ -295,12 +292,8 @@ SECTIONS
         PROVIDE (_stack_safe = .);
     } > DLM
 
-    .ahb_sram (NOLOAD) : {
-        KEEP(*(.ahb_sram))
-        KEEP(*(.ahb_sram.*))
-    } > AHB_SRAM
-
     __fw_size__ = SIZEOF(.start) + SIZEOF(.vectors) + SIZEOF(.rel) + SIZEOF(.text) + SIZEOF(.data) + SIZEOF(.fast) + SIZEOF(.tdata) + SIZEOF(.noncacheable.init) + SIZEOF(.fast_ram.init);
     __last_addr__ = __fast_ram_init_load_addr__ + SIZEOF(.fast_ram.init);
     ASSERT(((__fw_size__ <= LENGTH(XPI0)) && (__last_addr__ <= (ORIGIN(XPI0) + LENGTH(XPI0)))), "******  FAILED! XPI0 has not enough space!  ******")
+
 }

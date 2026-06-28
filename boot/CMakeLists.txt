@@ -1,44 +1,35 @@
 cmake_minimum_required(VERSION 3.13)
 
-set(APP_NAME hpm-uf2-boot)
-set(BOARD_SEARCH_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../board)
+set(APP_NAME hpm-dfu-boot)
+set(BOARD_SEARCH_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../boards)
 
 # RISC-V architecture with CSR and fence extensions
 set(RV_ARCH "rv32imac_zicsr_zifencei")
 set(RV_ABI "ilp32")
 
 # Bootloader linker script
-set(CUSTOM_GCC_LINKER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/flash_boot.ld)
-set(HEAP_SIZE 0x800)
+set(CUSTOM_GCC_LINKER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/linkfile/flash_boot.ld)
+set(HEAP_SIZE 0x0)
 set(STACK_SIZE 0x2000)
 
-# Enable CherryUSB (DFU-only baseline)
+# Prevent SDK from forcing -u _printf_float/-u _scanf_float (saves ~31KB)
+set(HPM_SDK_LD_NO_NANO_SPECS 1)
+
+# Enable CherryUSB (DFU only)
+# CONFIG_CHERRYUSB_DEVICE must be set explicitly because the SDK's
+# cherryusb CMakeLists.txt does not include CONFIG_USB_DEVICE_DFU in
+# the condition that triggers device core compilation.
 set(CONFIG_CHERRYUSB 1)
+set(CONFIG_CHERRYUSB_DEVICE 1)
 set(CONFIG_USB_DEVICE 1)
 set(CONFIG_USB_DEVICE_DFU 1)
-set(CONFIG_SEGGER_RTT 1)
-# NOTE: HPM SDK cherryusb CMake currently does not gate usbd_core on DFU flag,
-# so keep one standard device class enabled to pull in USB device core/driver.
-set(CONFIG_USB_DEVICE_MSC 1)
 
 # Find HPM SDK
 find_package(hpm-sdk REQUIRED HINTS $ENV{HPM_SDK_BASE})
-project(hpm_uf2_boot)
+project(hpm_dfu_boot)
 
-# Generate dfu_webusb.h from HTML - must be before source compilation
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/dfu_webusb.h
-    COMMAND ${CMAKE_COMMAND} -E echo "Generating dfu_webusb.h..."
-    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/file_to_header.py
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/webdfu_ultra.html
-            ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/file_to_header.py
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
-    COMMENT "Generating dfu_webusb.h from webdfu_ultra.html"
-)
-
-add_custom_target(generate_webdfu_header 
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/dfu_webusb.h
-)
+# Use nano libc without printf_float/scanf_float (saves ~31KB)
+sdk_ld_options("--specs=nano.specs")
 
 # Include CherryUSB DFU class manually (HPM SDK doesn't include it by default)
 sdk_inc($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu)
@@ -47,35 +38,26 @@ sdk_inc($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu)
 sdk_inc(.)
 sdk_inc(port)
 
-# Source files - Full MSC + DFU bootloader
+# CherryUSB config (must be before cherryusb includes)
+sdk_compile_definitions(-D__INCLUDE_CHERRYUSB_CONFIG_H__)
+sdk_inc(${CMAKE_CURRENT_SOURCE_DIR})
+
+# Source files - DFU-only bootloader
 sdk_app_src(app_main.c)
-sdk_app_src(bootuf2.c)
-sdk_app_src(msc_bootuf2_desc.c)
+sdk_app_src(dfu_desc.c)
 sdk_app_src(port/hpm/boot_flash_port_hpm.c)
 sdk_app_src(port/hpm/boot_port_hpm.c)
 sdk_app_src(port/hpm/boot_port_board_hpm.c)
 
-# Add DFU class source (not included by HPM SDK by default)
+# CherryUSB DFU class source
 sdk_app_src($ENV{HPM_SDK_BASE}/middleware/cherryusb/class/dfu/usbd_dfu.c)
 
 # Compile definitions
-sdk_compile_definitions(-DCONFIG_USB_HS=1)  # Use High Speed for maximum performance
-sdk_compile_definitions(-DBOARD_UF2_SIGNATURE=0x0A4D5048)
-sdk_compile_definitions(-DUSBD_DFU_XFER_SIZE=4096)  # 4KB - testing Windows driver limit
-sdk_compile_definitions(-DUSBD_DFU_APP_DEFAULT_ADD=0x80020000)
-sdk_compile_definitions(-DFLASH_ERASE_TIME=15000)  # 15 seconds for full 896KB erase
-sdk_compile_definitions(-DFLASH_PROGRAM_TIME=120)  # 120ms per 4KB write
-sdk_compile_definitions(-DCONFIG_USB_PRINTF=printf)
-sdk_compile_definitions(-DCONFIG_USB_DBG_LEVEL=2)
-sdk_compile_definitions(-DCONFIG_NDEBUG_CONSOLE=1)
-sdk_compile_definitions(-DGDB_PACKET_BUFFER_SIZE=16384)
+sdk_compile_definitions(-DUSBD_DFU_XFER_SIZE=4096)
 
-# Disable BOOT_PRINTF and printf in Release builds
+# Disable BOOT_PRINTF and UART console in Release builds
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     sdk_compile_definitions(-DNDEBUG)
-    message(STATUS "Release build: BOOT_PRINTF disabled")
+    sdk_compile_definitions(-DCONFIG_NDEBUG_CONSOLE=1)
+    message(STATUS "Release build: BOOT_PRINTF + console disabled")
 endif()
-
-# Generate IDE projects and ensure HTML header is generated before compilation
-# generate_ide_projects()
-add_dependencies(app generate_webdfu_header)

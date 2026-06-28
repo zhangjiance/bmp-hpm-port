@@ -2,7 +2,7 @@
  * Copyright (c) 2024 HPMicro
  * SPDX-License-Identifier: BSD-3-Clause
  *
- * HPM UF2 Bootloader Linker Script
+ * HPM DFU Bootloader Linker Script
  */
 
 ENTRY(_start)
@@ -11,14 +11,14 @@ STACK_SIZE = _stack_size;
 HEAP_SIZE = _heap_size;
 
 /* Memory layout:
- * 0x80000000 - 0x80020000 (128KB): Bootloader
- * 0x80020000 - 0x80100000 (896KB): Application
+ * 0x80000000 - 0x80010000 (64KB):  Bootloader
+ * 0x80010000 - 0x80100000 (960KB): Application
  * 0x80100000 - 0x80120000 (128KB): Reserved (e.g., settings, B slot)
  */
 
 MEMORY
 {
-    FLASH (rx) : ORIGIN = 0x80000000, LENGTH = 128K
+    FLASH (rx) : ORIGIN = 0x80000000, LENGTH = 64K
     ILM (wx) : ORIGIN = 0x00000000, LENGTH = 128K
     DLM (w) : ORIGIN = 0x00080300, LENGTH = 128K - 768
     AHB_SRAM (w) : ORIGIN = 0xF0400000, LENGTH = 32k
@@ -26,7 +26,7 @@ MEMORY
 
 __nor_cfg_option_load_addr__ = ORIGIN(FLASH) + 0x400;
 __boot_header_load_addr__ = ORIGIN(FLASH) + 0x1000;
-__app_load_addr__ = ORIGIN(FLASH) + 0x3000;
+__app_load_addr__ = ORIGIN(FLASH) + 0x1100;
 __boot_header_length__ = __boot_header_end__ - __boot_header_start__;
 __app_offset__ = __app_load_addr__ - __boot_header_load_addr__;
 

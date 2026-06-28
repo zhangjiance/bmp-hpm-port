@@ -83,13 +83,6 @@ int boot_flash_port_erase_app(void);
  */
 bool boot_flash_port_check_app_valid(void);
 
-/**
- * @brief Accumulate checksum of flash data (for integrity checking)
- * @param addr Flash address
- * @param len Length of data
- */
-void boot_flash_port_accumulate_checksum(uint32_t addr, size_t len);
-
 #ifdef __cplusplus
 }
 #endif

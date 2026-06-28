@@ -1,63 +1,44 @@
 /*
- * USB Configuration for UF2 Bootloader
+ * CherryUSB USB Configuration for DFU Bootloader (HPM5301)
  */
-
 #ifndef USB_CONFIG_H
 #define USB_CONFIG_H
 
-/* USB printf configuration */
-#ifndef CONFIG_USB_PRINTF
-#define CONFIG_USB_PRINTF(...) ((void)0)
+#include "board.h"
+#include "boot_log.h"
+
+#define CONFIG_USB_PRINTF(...) BOOT_PRINTF(__VA_ARGS__)
+#define CONFIG_USB_DBG_LEVEL USB_DBG_INFO
+
+#if defined(CONFIG_USB_DEVICE_FS) || defined(CONFIG_USB_DEVICE_FORCE_FULL_SPEED)
+#undef CONFIG_USB_HS
+#else
+#define CONFIG_USB_HS
 #endif
 
-/* USB Device Configuration */
-#define CONFIG_USBDEV_MAX_BUS 1
-#define CONFIG_USBDEV_ADVANCE_DESC 1  /* Use advanced descriptor API */
-
-/* Endpoint Configuration */
-#define CONFIG_USBDEV_EP_NUM 8
-
-/* USB Transfer Buffer Configuration */
 #define CONFIG_USB_ALIGN_SIZE 4
-#define CONFIG_USBDEV_REQUEST_BUFFER_LEN 5120  /* Must >= DFU transfer size (4096) */
-
-/* USB Host Configuration (needed for core compilation) */
-#define CONFIG_USBHOST_MAX_ENDPOINTS 4
-#define CONFIG_USBHOST_DEV_NAMELEN 32
-#define CONFIG_USBHOST_MAX_INTF_ALTSETTINGS 1
-#define CONFIG_USBHOST_MAX_INTERFACES 6
-#define CONFIG_USBHOST_MAX_EHPORTS 4
-
-/* Enable USB Device MSC Class */
-#define CONFIG_USBDEV_MSC_BLOCK_SIZE 512
-#define CONFIG_USBDEV_MSC_MAX_LUN 1
-#define CONFIG_USBDEV_MSC_MAX_BUFSIZE 4096
-#define CONFIG_USBDEV_MSC_MANUFACTURER_STRING "HPMicro"
-#define CONFIG_USBDEV_MSC_PRODUCT_STRING      "UF2 Bootloader"
-#define CONFIG_USBDEV_MSC_VERSION_STRING      "1.0"
-
-/* Enable USB Device DFU Class */
-#define CONFIG_USBDEV_DFU_TRANSFER_SIZE 4096  /* Match USBD_DFU_XFER_SIZE in CMakeLists.txt */
-
-/* Logging Configuration */
-#ifndef USBD_LOG_LEVEL
-#define USBD_LOG_LEVEL USB_LOG_INFO
-#endif
-
-/* USB Memory attributes */
 #define USB_NOCACHE_RAM_SECTION __attribute__((section(".noncacheable")))
-#define USB_MEM_ALIGNX __attribute__((aligned(64)))
 
-/* CherryUSB Feature Configuration */
-#define USBD_IRQ_HANDLER USB0_IRQHandler
-#define USBD_NUM 1
+#define USBD_VID           0x34BF
+#define USBD_PID           0x0003
+#define USBD_MAX_POWER     100
 
-#ifndef CONFIG_HPM_USBD_BASE
+#define CONFIG_USBDEV_REQUEST_BUFFER_LEN 4096
+#define CONFIG_USBDEV_ADVANCE_DESC
+#define CONFIG_USBDEV_MAX_BUS 1
+
+#define CONFIG_USB_DEVICE 1
+#define CONFIG_USB_DEVICE_DFU 1
+
+#define CONFIG_USBHOST_MAX_RHPORTS 1
+#define CONFIG_USBHOST_MAX_EXTHUBS 1
+#define CONFIG_USBHOST_MAX_EHPORTS 4
+#define CONFIG_USBHOST_MAX_INTERFACES 4
+#define CONFIG_USBHOST_MAX_INTF_ALTSETTINGS 1
+#define CONFIG_USBHOST_MAX_ENDPOINTS 4
+#define CONFIG_USBHOST_DEV_NAMELEN 16
+
 #define CONFIG_HPM_USBD_BASE HPM_USB0_BASE
-#endif
-
-#ifndef CONFIG_HPM_USBD_IRQn
 #define CONFIG_HPM_USBD_IRQn IRQn_USB0
-#endif
 
 #endif /* USB_CONFIG_H */

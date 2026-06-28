@@ -16,8 +16,8 @@
 #endif
 
 /* Application region configuration */
-#define BOOT_FLASH_APP_START    0x80020000  /* 128KB bootloader */
-#define BOOT_FLASH_APP_SIZE     0xE0000     /* 896KB application */
+#define BOOT_FLASH_APP_START    0x80010000  /* 64KB bootloader */
+#define BOOT_FLASH_APP_SIZE     0xF0000     /* 960KB application */
 #define BOOT_FLASH_APP_END      (BOOT_FLASH_APP_START + BOOT_FLASH_APP_SIZE)
 #define BOOT_FLASH_PAGE_SIZE    4096        /* 4KB sector size */
 
@@ -229,33 +229,17 @@ bool boot_flash_port_check_app_valid(void)
     fencei();
     
     const uint32_t *app_start = (const uint32_t *)BOOT_FLASH_APP_START;
-    const uint32_t signature = app_start[0];
-    const uint32_t first_code = app_start[1];
+    const uint32_t first_word = app_start[0];
     
-    BOOT_PRINTF("[BOOT] Checking app at 0x%08lx\r\n", BOOT_FLASH_APP_START);
-    BOOT_PRINTF("[BOOT]   Signature: 0x%08lx (expect 0x%08lx)\r\n", signature, (unsigned long)BOARD_UF2_SIGNATURE);
-    BOOT_PRINTF("[BOOT]   First code: 0x%08lx\r\n", first_code);
+    BOOT_PRINTF("[BOOT] Checking app at 0x%08lx, first word: 0x%08lx\r\n",
+                BOOT_FLASH_APP_START, first_word);
     
-    /* Check 1: Must have UF2 signature at offset 0 */
-    if (signature != BOARD_UF2_SIGNATURE) {
-        BOOT_PRINTF("[BOOT]   Result: INVALID (wrong signature)\r\n");
+    /* Check if flash is erased (0xFFFFFFFF = erased state) */
+    if (first_word == 0xFFFFFFFF) {
+        BOOT_PRINTF("[BOOT] No valid application (erased flash)\r\n");
         return false;
     }
     
-    /* Check 2: Code at offset +4 must not be erased */
-    if (first_code == 0xFFFFFFFF) {
-        BOOT_PRINTF("[BOOT]   Result: INVALID (no app code)\r\n");
-        return false;
-    }
-    
-    BOOT_PRINTF("[BOOT]   Result: VALID\r\n");
+    BOOT_PRINTF("[BOOT] Valid application found\r\n");
     return true;
-}
-
-void boot_flash_port_accumulate_checksum(uint32_t addr, size_t len)
-{
-    /* Checksum accumulation is handled in bootuf2.c */
-    /* This is just a placeholder for port compatibility */
-    (void)addr;
-    (void)len;
 }

@@ -9,7 +9,7 @@
         {
             "name": "base-boot",
             "hidden": true,
-            "description": "Base preset for UF2 bootloader",
+            "description": "Base preset for DFU bootloader",
             "binaryDir": "${sourceDir}/build",
             "generator": "Ninja",
             "cacheVariables": {
@@ -27,8 +27,8 @@
         },
         {
             "name": "hslinklite-boot",
-            "displayName": "HSLink Lite UF2 Bootloader",
-            "description": "UF2 Bootloader for HSLink Lite (128KB @ 0x80000000)",
+            "displayName": "HSLink Lite DFU Bootloader",
+            "description": "DFU Bootloader for HSLink Lite (128KB @ 0x80000000)",
             "inherits": "base-boot",
             "cacheVariables": {
                 "BOARD": "hslinklite"
@@ -36,8 +36,8 @@
         },
         {
             "name": "hslinklite-boot-debug",
-            "displayName": "HSLink Lite UF2 Bootloader (Debug)",
-            "description": "UF2 Bootloader for HSLink Lite with debug symbols",
+            "displayName": "HSLink Lite DFU Bootloader (Debug)",
+            "description": "DFU Bootloader for HSLink Lite with debug symbols",
             "inherits": "hslinklite-boot",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
@@ -45,8 +45,8 @@
         },
         {
             "name": "hslinkpro-boot",
-            "displayName": "HSLink Pro UF2 Bootloader",
-            "description": "UF2 Bootloader for HSLink Pro (128KB @ 0x80000000)",
+            "displayName": "HSLink Pro DFU Bootloader",
+            "description": "DFU Bootloader for HSLink Pro (128KB @ 0x80000000)",
             "inherits": "base-boot",
             "cacheVariables": {
                 "BOARD": "hslinkpro"
@@ -54,8 +54,8 @@
         },
         {
             "name": "hslinkpro-boot-debug",
-            "displayName": "HSLink Pro UF2 Bootloader (Debug)",
-            "description": "UF2 Bootloader for HSLink Pro with debug symbols",
+            "displayName": "HSLink Pro DFU Bootloader (Debug)",
+            "description": "DFU Bootloader for HSLink Pro with debug symbols",
             "inherits": "hslinkpro-boot",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
