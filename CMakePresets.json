@@ -36,7 +36,6 @@
             "name": "hslinklite-xip-release",
             "displayName": "HSLink Lite XIP (Release)",
             "inherits": "base",
-            "binaryDir": "${sourceDir}/build-hslinklite",
             "cacheVariables": {
                 "BOARD": "hslinklite"
             },
@@ -55,7 +54,6 @@
             "name": "hslinklite-dfu-release",
             "displayName": "HSLink Lite DFU (Release)",
             "inherits": "base",
-            "binaryDir": "${sourceDir}/build-hslinklite",
             "cacheVariables": {
                 "BOARD": "hslinklite",
                 "HPM_BUILD_TYPE": "flash_dfu"
@@ -76,7 +74,6 @@
             "name": "hslinkpro-xip-release",
             "displayName": "HSLink Pro XIP (Release)",
             "inherits": "base",
-            "binaryDir": "${sourceDir}/build-hslinkpro",
             "cacheVariables": {
                 "BOARD": "hslinkpro"
             },
@@ -95,7 +92,6 @@
             "name": "hslinkpro-dfu-release",
             "displayName": "HSLink Pro DFU (Release)",
             "inherits": "base",
-            "binaryDir": "${sourceDir}/build-hslinkpro",
             "cacheVariables": {
                 "BOARD": "hslinkpro",
                 "HPM_BUILD_TYPE": "flash_dfu"

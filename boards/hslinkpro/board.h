@@ -27,6 +27,7 @@
 #define BOARD_NAME "hslinkpro"
 #define BOARD_UF2_SIGNATURE (0x0A4D5048UL)
 #define BOARD_DFU_SIGNATURE (0x48504D21UL)  /* "HPM!" */
+#define BOARD_BGPR          HPM_BGPR0
 
 static const uint32_t HARDWARE_VER_ADDR = 70;
 
@@ -180,6 +181,13 @@ uint64_t millis();
 #define BOARD_BTN_GPIO_PIN 3
 #define BOARD_BTN_GPIO_IRQ IRQn_GPIO0_A
 #define BOARD_BTN_PRESSED_VALUE 1
+
+/* Alias for app-to-boot key detection (same pin as BTN: PA03) */
+#define BOARD_APP_GPIO_CTRL    BOARD_BTN_GPIO_CTRL
+#define BOARD_APP_GPIO_INDEX   BOARD_BTN_GPIO_INDEX
+#define BOARD_APP_GPIO_PIN     BOARD_BTN_GPIO_PIN
+#define BOARD_APP_GPIO_IRQ     BOARD_BTN_GPIO_IRQ
+#define BOARD_BUTTON_PRESSED_VALUE BOARD_BTN_PRESSED_VALUE
 
 /* spi section */
 #define BOARD_APP_SPI_BASE HPM_SPI1

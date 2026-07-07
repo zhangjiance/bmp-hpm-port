@@ -174,6 +174,7 @@ void board_init(void) {
   HSP_Init();
   EWDG_Init();
   init_gpio_swj_pins();
+  init_gpio_pins();
 
   // print info
 #if BOARD_SHOW_CLOCK

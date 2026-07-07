@@ -22,7 +22,6 @@
 #include "hpm_clock_drv.h"
 #include "usb_config.h"
 
-
 #include "general.h"
 #include "platform.h"
 #include "gdb_if.h"
@@ -38,9 +37,9 @@
 #endif
 #include "jtag_port.h"
 
-
 #include "rtt.h"
 #include "aux_serial.h"
+#include "hpm_dfu_trigger.h"
 
 
 /***************************************Variables************************************/
@@ -85,10 +84,37 @@ int main(void) {
   cdc_acm_init(0, (uint32_t)HPM_USB0);
   board_timer_create(50, board_timer_process);
 
+#ifdef BOARD_APP_GPIO_CTRL
+  int key_press_count = 0;
+  int key_prev = 0;
+#endif
+
   while (true) {
     /* Poll UART RX and transfer to USB (only in UART mode) */
     aux_serial_uart_poll();
-    
+
+#ifdef BOARD_APP_GPIO_CTRL
+    /* Button: toggle LED on each press, hold 2s to enter bootloader */
+    {
+      uint8_t key = gpio_read_pin(BOARD_APP_GPIO_CTRL,
+                                   BOARD_APP_GPIO_INDEX,
+                                   BOARD_APP_GPIO_PIN);
+      int pressed = (key == BOARD_BUTTON_PRESSED_VALUE);
+      if (pressed && !key_prev) {
+        board_led_toggle();  /* toggle once per press edge */
+      }
+      if (pressed) {
+        key_press_count++;
+        if (key_press_count >= 200) {  /* ~2 seconds hold */
+          hpm_dfu_reboot_to_dfu();
+        }
+      } else {
+        key_press_count = 0;
+      }
+      key_prev = pressed;
+    }
+#endif
+
     TRY(EXCEPTION_ALL) { bmp_poll_loop(); }
     CATCH() {
     default:

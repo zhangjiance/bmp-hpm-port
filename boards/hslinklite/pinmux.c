@@ -113,6 +113,17 @@ void init_gpio_swj_pins(void)
     gpio_write_pin(HPM_FGPIO, GPIO_DO_GPIOA, 30, 1);
 }
 
+void init_gpio_pins(void)
+{
+    /* Button (PA03): assign to GPIO0, pull-down, schmitt trigger */
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 3, gpiom_soc_gpio0);
+    uint32_t pad_ctl = IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0) | IOC_PAD_PAD_CTL_HYS_SET(1);
+    HPM_IOC->PAD[IOC_PAD_PA03].FUNC_CTL = IOC_PA03_FUNC_CTL_GPIO_A_03;
+    HPM_IOC->PAD[IOC_PAD_PA03].PAD_CTL = pad_ctl;
+    gpio_set_pin_input(BOARD_APP_GPIO_CTRL, BOARD_APP_GPIO_INDEX, BOARD_APP_GPIO_PIN);
+    gpio_disable_pin_interrupt(BOARD_APP_GPIO_CTRL, BOARD_APP_GPIO_INDEX, BOARD_APP_GPIO_PIN);
+}
+
 void init_jtag_pins(void) {
   HPM_IOC->PAD[IOC_PAD_PA06].FUNC_CTL = IOC_PA06_FUNC_CTL_JTAG_TCK;
 

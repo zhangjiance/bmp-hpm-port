@@ -143,9 +143,11 @@ void init_gpio_pins(void)
     /* enable schmitt trigger to eliminate jitter of pin used as button */
 
     /* Button */
+    gpiom_set_pin_controller(HPM_GPIOM, GPIOM_ASSIGN_GPIOA, 3, gpiom_soc_gpio0);
     uint32_t pad_ctl = IOC_PAD_PAD_CTL_PE_SET(1) | IOC_PAD_PAD_CTL_PS_SET(0) | IOC_PAD_PAD_CTL_HYS_SET(1);
     HPM_IOC->PAD[IOC_PAD_PA03].FUNC_CTL = IOC_PA03_FUNC_CTL_GPIO_A_03;
     HPM_IOC->PAD[IOC_PAD_PA03].PAD_CTL = pad_ctl;
+    gpio_set_pin_input(BOARD_BTN_GPIO_CTRL, BOARD_BTN_GPIO_INDEX, BOARD_BTN_GPIO_PIN);
 }
 
 void init_spi_pins(SPI_Type *ptr)

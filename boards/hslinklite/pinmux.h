@@ -21,6 +21,7 @@
  #endif
  
  void init_adc_pins(void);
+ void init_gpio_pins(void);
  void init_py_pins_as_pgpio(void);
  void init_gpio_swj_pins(void);
  void init_jtag_pins(void);

@@ -17,6 +17,9 @@ set(BOARD_SEARCH_PATH ${CMAKE_CURRENT_SOURCE_DIR}/boards)
 find_package(hpm-sdk REQUIRED HINTS $ENV{HPM_SDK_BASE})
 project(cherrybmp)
 
+# Reserve 128KB for DFU bootloader (only affects flash_dfu.ld)
+sdk_linker_global_symbols("_dfu_bl_length=0x20000")
+
 sdk_inc(src)
 
 add_subdirectory(bmp_port)
@@ -26,5 +29,6 @@ sdk_compile_definitions(-DGDB_PACKET_BUFFER_SIZE=16384)
 
 sdk_compile_definitions(-DDISABLE_IRQ_PREEMPTIVE=1)
 sdk_app_src(main.c)
+sdk_app_src(src/hpm_dfu_trigger.c)
 
 # generate_ide_projects()
