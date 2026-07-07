@@ -86,6 +86,11 @@ ATTR_PLACE_AT(".uf2_signature")
 __attribute__((used)) const uint32_t uf2_signature = BOARD_UF2_SIGNATURE;
 #endif
 
+#if defined(FLASH_DFU) && FLASH_DFU
+ATTR_PLACE_AT(".dfu_signature")
+__attribute__((used)) const uint32_t dfu_signature = BOARD_DFU_SIGNATURE;
+#endif
+
 void board_init_console(void) {
 #if !defined(CONFIG_NDEBUG_CONSOLE) || !CONFIG_NDEBUG_CONSOLE
 #if BOARD_CONSOLE_TYPE == CONSOLE_TYPE_UART
@@ -216,8 +221,7 @@ void board_init_usb_dp_dm_pins(void) {
   }
 }
 
-void board_init_clock(void)
-{
+void board_init_clock(void) {
     uint32_t cpu0_freq = clock_get_frequency(clock_cpu0);
 
     if (cpu0_freq == PLLCTL_SOC_PLL_REFCLK_FREQ) {
@@ -237,7 +241,7 @@ void board_init_clock(void)
     clock_add_to_group(clock_gpio, 0);
     clock_add_to_group(clock_hdma, 0);
     clock_add_to_group(clock_xpi0, 0);
-
+    
     /* Connect Group0 to CPU0 */
     clock_connect_group_to_cpu(0, 0);
 

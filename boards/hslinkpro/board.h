@@ -26,6 +26,7 @@
 
 #define BOARD_NAME "hslinkpro"
 #define BOARD_UF2_SIGNATURE (0x0A4D5048UL)
+#define BOARD_DFU_SIGNATURE (0x48504D21UL)  /* "HPM!" */
 
 static const uint32_t HARDWARE_VER_ADDR = 70;
 

@@ -7,11 +7,6 @@ set(RV_ARCH "rv32imac_zicsr_zifencei")
 
 set(APP_NAME "bmp-hpm-port")
 
-
-set(CUSTOM_GCC_LINKER_FILE
-        ${CMAKE_CURRENT_SOURCE_DIR}/linkfile/flash_dfu.ld
-)
-
 set(CONFIG_SEGGER_RTT 1)
 set(CONFIG_CHERRYRB 1)
 set(CONFIG_CHERRYUSB 1)
@@ -23,7 +18,6 @@ find_package(hpm-sdk REQUIRED HINTS $ENV{HPM_SDK_BASE})
 project(cherrybmp)
 
 sdk_inc(src)
-
 
 add_subdirectory(bmp_port)
 

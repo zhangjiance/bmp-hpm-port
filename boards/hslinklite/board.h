@@ -22,6 +22,8 @@
 
 #define BOARD_NAME "cherrybmp"
 #define BOARD_UF2_SIGNATURE (0x0A4D5048UL)
+#define BOARD_DFU_SIGNATURE (0x48504D21UL)  /* "HPM!" */
+#define BOARD_BGPR          HPM_BGPR0
 
 /* ACMP desction */
 #define BOARD_ACMP HPM_ACMP

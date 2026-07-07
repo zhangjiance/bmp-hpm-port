@@ -74,6 +74,11 @@ ATTR_PLACE_AT(".uf2_signature")
 __attribute__((used)) const uint32_t uf2_signature = BOARD_UF2_SIGNATURE;
 #endif
 
+#if defined(FLASH_DFU) && FLASH_DFU
+ATTR_PLACE_AT(".dfu_signature")
+__attribute__((used)) const uint32_t dfu_signature = BOARD_DFU_SIGNATURE;
+#endif
+
 static uint32_t MCHTMR_CLK_FREQ = 0;
 
 void board_led_write(uint8_t state) {}
