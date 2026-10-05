@@ -11,7 +11,9 @@
 #include "board.h"
 #include "hpm_common.h"
 #include "hpm_soc.h"
+#include "hpm_l1c_drv.h"
 #include "hpm_ppor_drv.h"
+#include "hpm_romapi.h"
 #ifdef HPM_BCFG_BASE
 #include "hpm_bgpr_drv.h"
 #endif
@@ -59,6 +61,19 @@ void hpm_dfu_reboot_to_dfu(void)
     pdgo_write_gpr(HPM_PDGO, DFU_TRIGGER_BGPR_INDEX, DFU_TRIGGER_MAGIC);
 #endif
     printf("dfu trigger received, reboot to DFU bootloader...\r\n");
+
+    disable_global_irq(CSR_MSTATUS_MIE_MASK);
+    l1c_dc_invalidate_all();
+    l1c_dc_disable();
+    fencei();
+
+    api_boot_arg_t boot_arg = {
+        .index = 0,
+        .peripheral = API_BOOT_PERIPH_AUTO,
+        .src = API_BOOT_SRC_PRIMARY,
+        .tag = API_BOOT_TAG,
+    };
+    (void)ROM_API_TABLE_ROOT->run_bootloader(&boot_arg);
 
     ppor_reset_mask_set_source_enable(HPM_PPOR, ppor_reset_software);
     ppor_sw_reset(HPM_PPOR, 24);
