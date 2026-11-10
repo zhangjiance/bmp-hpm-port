@@ -118,6 +118,15 @@ uint32_t rtt_write_buffer(const char *buf, uint32_t len)
     return written;
 }
 
+/* Load host->target data coming from the RTT command into the down buffer */
+void rtt_load_recv_buf(const char *const buffer, const size_t len)
+{
+    if (!buffer || !len)
+        return;
+
+    (void)rtt_write_buffer(buffer, (uint32_t)len);
+}
+
 /* Debug function to track data flow */
 uint32_t rtt_get_write_total(void)
 {
