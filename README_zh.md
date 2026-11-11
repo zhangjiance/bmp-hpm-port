@@ -8,24 +8,27 @@
 - hslinkpro(hpm5301)
   - ![alt text](image/hslinkpro.png)
 
-## 工程说明
+> English overview: [README.md](./README.md). 编译指导：[README_build.md](./README_build.md)（英文）/ [README_build_zh.md](./README_build_zh.md)（中文）。
 
-### 依赖说明
+---
 
-目前工程使用vscode进行开发，建议安装以下插件：
+## 如何编译
 
-- `C/C++`
-- `CMake`
-- `CMake Tools`
-- `HPM Pinmux Tool`
+本工程依赖 **HPM SDK 1.13** 与 `riscv-none-elf` 交叉编译工具链，二者缺一不可。编译器与 SDK 路径全部通过环境变量提供，`CMakePresets.json` 中不再包含硬编码路径。
 
-工程依赖hpm_sdk，建议使用`1.8`版本。
-使用时需要将`hpm_sdk`路径及工具链添加到环境变量中,也可在工程settings.json中配置。
+详见 **[README_build.md](./README_build.md)** / **[README_build_zh.md](./README_build_zh.md)**，简要流程：
 
-- `HPM_SDK_BASE`：hpm_sdk的安装路径
-  - 示例：`D:/sdk_env_v1.8.0/hpm_sdk`
-- `GNURISCV_TOOLCHAIN_PATH`：riscv toolchain的安装路径,无特殊需求，可使用sdk_env_v1.8.0/toolchains中的版本
-  - 示例：`D:/sdk_env_v1.8.0/toolchains/rv32imac_zicsr_zifencei_multilib_b_ext-win`
+```bash
+export PATH="<toolchain>/bin:$PATH"
+export HPM_SDK_BASE="<hpm_sdk根目录>"
+export GNURISCV_TOOLCHAIN_PATH="<toolchain根目录>"
+
+cmake --list-presets
+cmake --preset hslinklite-xip-release
+cmake --build --preset hslinklite-xip-release
+```
+
+---
 
 ## 效果展示
 
@@ -183,7 +186,6 @@ jtag配置文件参考:
     "svdFile":"${config:hpm_sdk_env}/hpm_sdk/soc/HPM5300/HPM5301/HPM5301_svd.xml",
 }
 ```
-
 
 ## 参考项目和文档
 
